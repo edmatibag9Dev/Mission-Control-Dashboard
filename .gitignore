@@ -6,6 +6,7 @@
 # Runtime data: task snapshot, heartbeats, ops-status, dated history archives
 runs/
 *.jsonl
+!samples/*.jsonl
 *.log
 
 # Local-only config holding personal identifiers (if ever needed)
