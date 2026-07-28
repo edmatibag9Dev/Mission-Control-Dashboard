@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-07-28T08:09:00-07:00",
+  "tasks": [
+    {"taskId": "example-routine", "description": "Example", "schedule": "At 06:00 PM, every day",
+     "enabled": true, "oneTime": false, "status": "ok", "detail": "ran Mon 7/27 6:00 PM",
+     "lastRunAt": "2026-07-28T01:00:20.000Z", "nextRunAt": "2026-07-29T01:00:00.000Z",
+     "expectedLast": "2026-07-27T18:00:00-07:00"}
+  ],
+  "script_jobs": [
+    {"id": "example.job", "desc": "Example launchd job", "schedule": "Daily 6:00 PM",
+     "status": "ok", "detail": "last activity Mon 7/27 6:00 PM", "last": "2026-07-28T01:00:00-07:00"}
+  ],
+  "servers": [
+    {"id": "example-server", "desc": "Example local server", "remote": false, "target": ":8080",
+     "status": "up", "detail": "port responding"}
+  ],
+  "digest": {"counts": {"new": 0, "sent": 0, "expiring": 0, "stale": 0}, "open_items": []},
+  "summary": {"active": 1, "ok": 1, "pending": 0, "new": 0, "missed_failed": 0, "flags": 0,
+              "job_issues": 0, "server_issues": 0, "digest_open": 0}
+}

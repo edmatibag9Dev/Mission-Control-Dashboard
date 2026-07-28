@@ -1,0 +1,24 @@
+# Mission Control Dashboard
+
+> Health monitor for Ed's automated fleet: a stdlib-only Python engine computes run health for every
+> scheduled routine (cron math + self-reported heartbeats), launchd script jobs (success-stamp
+> evidence), and local/remote servers (port + HTTP probes), renders one brand-styled dashboard, and a
+> daily watcher agent escalates per a four-lane policy — DM only when something is actually wrong.
+
+## Start here
+- [AGENTS.md](AGENTS.md): canonical agent guide — file map, data contract, invariants, gates.
+- [README.md](README.md): human quickstart.
+
+## Engine
+- [watch.py](watch.py): the whole engine — routine/job/server health + mission-control.html render.
+- [samples/](samples/): scrubbed samples of the gitignored runtime data shapes.
+
+## Scheduling
+- [SCHEDULE.md](SCHEDULE.md): the daily ops-watcher sweep — task location, cadence, prerequisites.
+
+## Key rules
+- heartbeat.jsonl and the cross-repo digest.jsonl are append-only; heartbeat absence is neutral.
+- Health comes from watch.py's computation only; agents never hand-assign statuses.
+- tokenburn health keys off the last-success stamp — watchdog log silence is healthy, not stale.
+- Remote-server unreachable = amber, never an escalation alone; reachable-but-stale = red.
+- mission-control.html and runs/ are generated/runtime — never committed, never hand-edited.

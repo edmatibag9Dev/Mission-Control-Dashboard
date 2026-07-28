@@ -1,0 +1,12 @@
+[
+  {
+    "taskId": "example-routine",
+    "description": "Example daily routine entry as returned by list_scheduled_tasks",
+    "schedule": "At 06:00 PM, every day",
+    "cronExpression": "0 18 * * *",
+    "enabled": true,
+    "nextRunAt": "2026-07-29T01:00:00.000Z",
+    "lastRunAt": "2026-07-28T01:00:20.000Z",
+    "jitterSeconds": 120
+  }
+]

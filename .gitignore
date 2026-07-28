@@ -1,0 +1,19 @@
+# Generated output & real/personal data — never commit
+
+# The rendered dashboard (rebuilt every run; embeds real schedules and finding texts)
+/mission-control.html
+
+# Runtime data: task snapshot, heartbeats, ops-status, dated history archives
+runs/
+*.jsonl
+*.log
+
+# Local-only config holding personal identifiers (if ever needed)
+CONFIG.local.md
+
+# Language / OS noise
+__pycache__/
+*.pyc
+.DS_Store
+
+# Note: scrubbed samples of ignored content live in samples/ so the repo previews.
