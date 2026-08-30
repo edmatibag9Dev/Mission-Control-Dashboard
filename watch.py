@@ -25,6 +25,7 @@ No third-party dependencies. Cron evaluated in local time (same Mac that fires t
 """
 
 import json
+import re
 import socket
 import sys
 import urllib.request
@@ -118,9 +119,29 @@ def prev_fire(expr: str, now: datetime, lookback_days: int = 9):
 # ---------------------------------------------------------------- helpers
 
 def parse_iso(s):
-    if not s:
+    """Tolerant ISO parse. Returns aware datetime in local tz, or None.
+
+    MUST stay tolerant. Python 3.9's fromisoformat is strict and raises on
+    `-0700` style offsets, which 72 of the 223 real heartbeat.jsonl rows use
+    (routines write their footers with differing formatters). This function
+    used to raise, and only survived because Ed's interactive PATH resolves to
+    a newer python -- under /usr/bin/python3 (3.9.6, what launchd would use)
+    it crashed on the first such row. Found 2026-08-30 while building
+    fleet_watchdog.py. A bad row must never take down the sweep.
+    """
+    if not s or not isinstance(s, str):
         return None
-    return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone()
+    s = s.strip().replace("Z", "+00:00")
+    m = re.search(r"([+-])(\d{2})(\d{2})$", s)
+    if m:
+        s = s[: m.start()] + "%s%s:%s" % (m.group(1), m.group(2), m.group(3))
+    try:
+        d = datetime.fromisoformat(s)
+    except Exception:
+        return None
+    if d.tzinfo is None:
+        d = d.astimezone()
+    return d.astimezone()
 
 
 def fmt(dt, now):

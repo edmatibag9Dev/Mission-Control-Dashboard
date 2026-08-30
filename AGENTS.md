@@ -22,6 +22,9 @@ noticing an absent Slack ping.**
 | `README.md` | yes | Human quickstart. |
 | `llms.txt` | yes | Machine-readable index. |
 | `watch.py` | yes | The whole engine: routine health calc, launchd checks, server probes, dashboard render. |
+| `fleet_watchdog.py` | yes | **Out-of-band** liveness monitor run by launchd, NOT by Claude. Judges routine health from work artifacts + the Claude app log; never from `lastRunAt`. See `WATCHDOG.md`. |
+| `WATCHDOG.md` | yes | Why the fleet watchdog exists (the 2026-08-19 outage), how it detects, and how to operate/test it. |
+| `runs/watchdog-state.json` | **no (gitignored)** | Fleet-watchdog dedup state + awake-tick ledger. |
 | `SCHEDULE.md` | yes | How the daily ops-watcher sweep is scheduled + prerequisites. |
 | `CONTRIBUTING.md` | yes | Commit format + README standards (canonical copy). |
 | `CHANGELOG.md` | yes | Dated change log. |
@@ -110,3 +113,21 @@ Invariants an agent must preserve:
 5. `git status --short` shows no `runs/` or `mission-control.html` entries staged.
 6. Scrub grep (`grep -rniE "@gmail|xoxb-|\bsk-[a-z0-9]{8,}|api[_-]key\s*[:=]" --exclude-dir=.git .`)
    matches nothing committed.
+
+## ⚠ `lastRunAt` IS NOT A LIVENESS SIGNAL
+
+Learned the hard way on **2026-08-19**, when a stale Claude OAuth session
+(`session_stale_relogin`) killed all 15 scheduled routines for 11 days without a single alert.
+
+`lastRunAt` from `list_scheduled_tasks` is stamped when a dispatch is **cleared as stale**, not
+only when a run succeeds. During the outage every task reported a recent `lastRunAt` and
+`enabled: true` while none had executed in days — `daily-ai-morning-briefing`'s
+`lastRunAt: 2026-08-30T15:00:48Z` was *exactly* its "Cleared stale pending dispatch" moment.
+
+**Any tooling that treats `lastRunAt` as proof of life will report a dead fleet as healthy.**
+The real signals are `runs/heartbeat.jsonl` (routines self-report at end of run), each routine's
+own output artifacts, and `~/Library/Logs/fleet-watchdog/last-ok`.
+
+`watch.py` still reads `lastRunAt` for scheduling arithmetic, which is fine — but it cross-checks
+heartbeats, and `fleet_watchdog.py` never reads it at all.
+
