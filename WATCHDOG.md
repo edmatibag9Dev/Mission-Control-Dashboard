@@ -88,13 +88,24 @@ that forces the `ai-briefing` site to mirror into `/Users/Shared`.
 
 `/usr/bin/python3` is **3.9.6**, whose `fromisoformat` is strict and cannot parse 72 of the 223
 real `heartbeat.jsonl` rows (e.g. `2026-07-28T18:17:09-0700`). `fleet_watchdog.py` carries its
-own tolerant `parse_ts` — do not "simplify" it. The same bug was found and fixed in `watch.py`,
+own tolerant `parse_ts` — do not "simplify" it.
+
+**Writers must emit the colon form.** BSD `date '+%z'` produces `-0700` (and macOS has no `%:z`),
+which is the source of the drift. Both new footers specify
+`/usr/bin/python3 -c "import datetime;print(datetime.datetime.now().astimezone().replace(microsecond=0).isoformat())"`
+instead, which yields `-07:00`. The same bug was found and fixed in `watch.py`,
 which had been surviving only because Ed's interactive PATH resolves to a newer python.
 
 ## Coverage gaps (known, not hidden)
 
-- `rockwell-daily-capture` and `evening-digest` emit **no heartbeat footer at all**; both use
-  file-mtime proxies. Adding the standard footer to their SKILL.md files is the real fix.
+- ~~`rockwell-daily-capture` and `evening-digest` emit no heartbeat footer~~ — **fixed 2026-08-30**:
+  both SKILL.md files gained one. Their mtime proxies are retained as fallback, because neither can
+  emit a heartbeat until it runs again (blocked on the auth fix); `assess()` takes the freshest
+  source, so the proxy carries them until the first real heartbeat lands and then HB wins.
+  `evening-digest`'s footer is **adapted**, not boilerplate: it owns the queue it files into, so its
+  Lane-2 append must come *after* its own atomic rewrite of `digest.jsonl` or it destroys its own row,
+  and its heartbeat explicitly overrides the two earlier "and stop" paths (an empty queue is a healthy
+  run and must still heartbeat `ok`).
 - `ops-watcher`'s own heartbeat is unreliable (5 rows, last 2026-08-16), hence its `ops-status.json`
   mtime as a secondary source.
 - **Mac powered off for days:** neither layer runs. No local design covers this; a Mac Studio–side

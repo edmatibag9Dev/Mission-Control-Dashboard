@@ -102,10 +102,16 @@ ROUTINES = [
     ("claude-token-dashboard-update",  "10 18 * * *",  120, [(HB, None),
                                                              (MT, HOME / "Library/Logs/tokenburn/last-success")]),
     ("mastermind-daily-capture",       "30 18 * * 1-5",120, [(HB, None)]),
-    # rockwell + evening-digest emit NO heartbeat footer -- mtime proxies until
-    # their SKILL.md files gain one (proposed separately, Ed approves).
-    ("rockwell-daily-capture",         "45 18 * * *",  150, [(MT, HOME / "Documents/Claude/Rockwell-Options-Capture/state.json")]),
-    ("evening-digest",                 "5 19 * * *",   120, [(MW, ORCHESTRATION / "runs" / "digest.jsonl")]),
+    # rockwell + evening-digest GAINED heartbeat footers 2026-08-30 (Ed approved).
+    # HB is listed first but the mtime proxies are RETAINED as fallback: neither
+    # task can emit a heartbeat until it actually runs again, which is blocked on
+    # the auth fix. assess() takes the FRESHEST source, so the proxy carries them
+    # until the first real heartbeat lands and then HB naturally wins. Dropping the
+    # proxies now would blind the watchdog during exactly the outage it was built for.
+    ("rockwell-daily-capture",         "45 18 * * *",  150, [(HB, None),
+                                                             (MT, HOME / "Documents/Claude/Rockwell-Options-Capture/state.json")]),
+    ("evening-digest",                 "5 19 * * *",   120, [(HB, None),
+                                                             (MW, ORCHESTRATION / "runs" / "digest.jsonl")]),
     ("token-dashboard-sentinel",       "20 19 * * *",  120, [(HB, None)]),
 ]
 # Deliberately excluded: freshwater-trip-log (manual), open-brain-wiki-update

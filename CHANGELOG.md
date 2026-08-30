@@ -4,6 +4,34 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-08-30b] — Heartbeat footers for the two routines that had none
+
+### Added
+- `rockwell-daily-capture` and `evening-digest` SKILL.md files gained attention-layer footers with
+  heartbeat emission. These were the only two of 15 routines emitting no heartbeat at all, so during
+  the 2026-08-19 outage their liveness could only be inferred from file mtimes — and for
+  `evening-digest` that proxy is the weakest in the fleet, since other routines append to the same
+  `digest.jsonl` and can make it look fresh while the job has not run in weeks.
+- `evening-digest`'s footer is **adapted, not boilerplate**, for two hazards specific to it:
+  (a) it owns the queue it files into, and duty 5 rewrites `digest.jsonl` atomically from a copy read
+  at duty 1 — so a Lane-2 row appended before that rewrite is destroyed by its own move; the footer
+  requires appending only afterward. (b) duties 1 and 4 both say "stop", which would have skipped the
+  heartbeat on an empty queue or a failed delivery; the footer explicitly overrides both, since an
+  empty queue is a healthy run and must still heartbeat `ok` or a quiet day is indistinguishable from
+  a dead routine.
+
+### Changed
+- `fleet_watchdog.py` ROUTINES now lists `HB` first for both tasks, with the mtime proxies **retained
+  as fallback** — neither can emit a heartbeat until it runs again, which is blocked on the auth fix,
+  and `assess()` takes the freshest source so the proxy carries them until the first real heartbeat
+  lands. Dropping the proxies now would blind the watchdog during the exact outage it was built for.
+
+### Fixed
+- Both footers specify the **colon form** of the UTC offset, generated with
+  `/usr/bin/python3 -c "...astimezone().replace(microsecond=0).isoformat()"`. BSD `date '+%z'` emits
+  `-0700` and macOS has no `%:z`; that is the source of the format drift that made 72 of 223 existing
+  heartbeat rows unparseable by strict `fromisoformat`. New writes will be canonical.
+
 ## [2026-08-30] — Fleet watchdog: out-of-band monitoring after the 11-day auth outage
 
 ### Context
