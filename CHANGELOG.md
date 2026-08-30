@@ -4,6 +4,38 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-08-30c] — Recovery detection, found by the actual recovery
+
+Ed re-authenticated at 11:39 and `action-item-triage` ran successfully at 12:17 — the first
+`Confirmed task run for:` in the log since 2026-08-19 04:10. Watching the watchdog handle that
+exposed three defects, all now fixed.
+
+### Fixed
+- **The recovery line was counted as a failure.** `[oauth] clearing latched session_stale_relogin
+  failures` contains the failure string, so `RE_STALE` matched the fix itself. Recovery and
+  not-a-failure patterns are now tested before `RE_STALE`.
+- **Recovery took ~20h to register.** Failure counts are windowed over 24h, so after a genuine fix
+  the window still held the pre-fix failures and the verdict stayed `AUTH_BLOCKED`. A recovery
+  marker newer than the newest failure is now decisive and overrides the counts.
+- **The post-recovery message read as a second incident.** With auth fixed, 12 routines still
+  carried fires missed *during* the outage, and the generic stale message announced them as
+  "12 routines stale — no auth failure found". Fires due before the auth-recovery moment are now
+  classified `backlog`: they never alert and clear when the routine next runs.
+
+### Changed
+- Recovery is detected **only** from `[CCDScheduledTasks] Confirmed task run for:`. `clearing
+  latched ...` was tried first and rejected on evidence: the app clears the latch periodically and
+  re-latches on the next failure, so it was the newest event for windows of up to **8.5 hours during
+  the outage** (2026-08-26 19:38:33 → next failure 511 min later). Using it would have fired a false
+  all-clear mid-outage. `Confirmed task run for:` appeared **zero** times across the 11 days.
+- Recovery message now reports the **original** cause (`opened_verdict`, preserved at incident open
+  rather than overwritten), lists only heartbeats *after* the recovery moment as "confirmed running",
+  and states the backlog explicitly as expected rather than as a fault.
+
+### Verified
+- All six windows where a `clearing latched` line was newest still return `AUTH_BLOCKED`.
+- The 2026-08-19 replay gate and the pre-incident control are unchanged.
+
 ## [2026-08-30b] — Heartbeat footers for the two routines that had none
 
 ### Added

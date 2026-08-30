@@ -339,6 +339,33 @@ RE_LATCH = re.compile(r"short-circuiting fresh /authorize on latched session_sta
 RE_CANNOT = re.compile(r"Cannot start session")
 RE_CLEARED = re.compile(r"\[CCDScheduledTasks\] Cleared stale pending dispatch for: (\S+)")
 
+# POSITIVE RECOVERY MARKERS. Two reasons these exist, both found 2026-08-30 when the
+# real outage was fixed and the watchdog failed to notice:
+#   1. "clearing latched session_stale_relogin failures" CONTAINS the failure string,
+#      so RE_STALE matched the fix itself and counted it as a failure. Recovery lines
+#      must be tested FIRST and excluded from the failure tally.
+#   2. The failure counts are windowed over 24h, so after a genuine fix the window
+#      still holds the pre-fix failures and the verdict stayed AUTH_BLOCKED for ~20
+#      more hours -- delaying the recovery message by most of a day. A recovery marker
+#      NEWER than the newest failure is decisive and overrides the counts.
+# "Confirmed task run for:" is the strongest of these: it appears only when a scheduled
+# session actually started, and appeared ZERO times during the 11-day outage.
+# ONLY "Confirmed task run for:" counts as recovery. It is emitted when a scheduled
+# session actually STARTED, and it appeared ZERO times inside the 11-day outage
+# (last before: 2026-08-19 04:10:13; first after: 2026-08-30 12:17:21).
+#
+# "clearing latched ..." was tried here first and REJECTED on the evidence: the app
+# clears the latch periodically and re-latches on the next failure, so it was the
+# newest event for windows of up to 8.5 HOURS *during* the outage (e.g. 2026-08-26
+# 19:38:33, next failure 511 min later). Treating it as recovery would have fired a
+# false all-clear mid-outage and then re-alerted -- exactly the flapping the dedup
+# logic exists to prevent. It is still excluded from the FAILURE tally below, since
+# the line contains the failure string, but it proves nothing on its own.
+RE_RECOVER = re.compile(r"\[CCDScheduledTasks\] Confirmed task run for")
+
+# Contains "session_stale_relogin" but is NOT a failure -- must not inflate the count.
+RE_NOT_FAILURE = re.compile(r"clearing latched session_stale_relogin failures")
+
 
 def scan_auth(logdir, now):
     # NOTE: every timestamp test below is bounded ABOVE by `now` as well as
@@ -352,7 +379,8 @@ def scan_auth(logdir, now):
     change would otherwise blind the cause layer silently.
     """
     out = {"verdict": "LOG_UNREADABLE", "n_stale": 0, "n_cannot": 0, "latched": False,
-           "cleared": {}, "episode_start": None, "newest_line": None, "files_read": 0}
+           "cleared": {}, "episode_start": None, "newest_line": None, "files_read": 0,
+           "newest_failure": None, "newest_recovery": None}
     logdir = Path(logdir)
     names = ["main.log", "main1.log", "main2.log", "main3.log", "main4.log"]
     files = [logdir / n for n in names if (logdir / n).exists()]
@@ -389,8 +417,18 @@ def scan_auth(logdir, now):
                     continue
                 if out["newest_line"] is None or ts > out["newest_line"]:
                     out["newest_line"] = ts
+                # Order matters: both branches below must be tested BEFORE RE_STALE,
+                # because the latch-clearing line contains the failure string.
+                if RE_RECOVER.search(line):
+                    if out["newest_recovery"] is None or ts > out["newest_recovery"]:
+                        out["newest_recovery"] = ts
+                    continue
+                if RE_NOT_FAILURE.search(line):
+                    continue
                 if RE_STALE.search(line):
                     stale_times.append(ts)
+                    if out["newest_failure"] is None or ts > out["newest_failure"]:
+                        out["newest_failure"] = ts
                     if ts >= cutoff:
                         out["n_stale"] += 1
                     if RE_LATCH.search(line) and ts >= cutoff:
@@ -398,6 +436,8 @@ def scan_auth(logdir, now):
                 if ts >= cutoff:
                     if RE_CANNOT.search(line):
                         out["n_cannot"] += 1
+                        if out["newest_failure"] is None or ts > out["newest_failure"]:
+                            out["newest_failure"] = ts
                     cm = RE_CLEARED.search(line)
                     if cm:
                         out["cleared"][cm.group(1)] = out["cleared"].get(cm.group(1), 0) + 1
@@ -411,8 +451,16 @@ def scan_auth(logdir, now):
                 start = b
         out["episode_start"] = start
 
+    rec, fail = out["newest_recovery"], out["newest_failure"]
+    recovered = rec is not None and (fail is None or rec > fail)
+
     if out["newest_line"] is None or (now - out["newest_line"]) > timedelta(hours=LOG_STALE_HOURS):
         out["verdict"] = "LOG_UNREADABLE"
+    elif recovered:
+        # A recovery marker newer than the newest failure is decisive, regardless of
+        # how many failures remain inside the 24h window.
+        out["verdict"] = "AUTH_OK"
+        out["latched"] = False
     elif out["n_cannot"] >= 1:
         out["verdict"] = "AUTH_BLOCKED"
     elif out["n_stale"] >= 1:
@@ -433,12 +481,18 @@ def claude_running():
 
 # ------------------------------------------------------------------ assess
 
-def assess(now, ticks, hb_latest, hb_newest):
+def assess(now, ticks, hb_latest, hb_newest, auth_ok_since=None):
     # COLD START: with no tick history we have no evidence the Mac was awake, so
     # we cannot distinguish "routine did not run" from "machine was off". A fresh
     # or reset state must therefore never emit a staleness verdict -- it builds
     # the ledger first. (Without this, first install alerts on 10 routines.)
     cold = len(ticks) < MIN_TICKS_FOR_STALE
+    # BACKLOG vs STALE. After an auth outage is fixed, every routine still carries the
+    # fires it missed while sign-in was broken. Those are a CONSEQUENCE of the resolved
+    # incident, not a new fault, and reporting them as "12 routines stale - no auth
+    # failure found" reads as a second incident. A fire that was DUE BEFORE auth
+    # recovered is classified "backlog": it clears on its own when the routine next
+    # runs, and it never alerts. Only a fire missed AFTER recovery is a real fault.
     rows = []
     for task, cron, grace_min, evidence in ROUTINES:
         r = {"id": task, "cron": cron, "state": "ok", "missed": 0,
@@ -479,13 +533,18 @@ def assess(now, ticks, hb_latest, hb_newest):
         elif best >= expected - LATE_SLACK:
             r["state"] = "ok"
         else:
-            r["state"] = "stale"
             r["weak"] = only_weak
             r["missed"] = count_fires(cron, best, now)
+            if auth_ok_since is not None and expected < auth_ok_since:
+                r["state"] = "backlog"   # missed while auth was broken; clears on next run
+            else:
+                r["state"] = "stale"
         rows.append(r)
 
     fleet_silent = False
-    if hb_newest is not None and not cold:
+    if auth_ok_since is not None:
+        pass  # backlog silence is expected right after a fix; not a fleet-down signal
+    elif hb_newest is not None and not cold:
         fleet_silent = awake_minutes(ticks, hb_newest, now) >= FLEET_SILENCE_AWAKE.total_seconds() / 60.0
     return rows, fleet_silent
 
@@ -557,7 +616,7 @@ def render_stale_msg(now, auth, rows, stale, weak_stale, running):
         r = byid[t]
         lines.append("• %s — %d fire%s missed, last evidence %s"
                      % (t, r["missed"], "" if r["missed"] == 1 else "s", fmt(r["evidence"])))
-    healthy = sum(1 for r in rows if r["state"] in ("ok", "pending"))
+    healthy = sum(1 for r in rows if r["state"] in ("ok", "pending", "backlog", "asleep"))
     lines.append("")
     lines.append("*Healthy:* %d of %d." % (healthy, len(ROUTINES)))
     if weak_stale:
@@ -568,22 +627,30 @@ def render_stale_msg(now, auth, rows, stale, weak_stale, running):
     return "\n".join(lines)
 
 
-def render_recovery_msg(now, inc, rows, hb_latest):
+def render_recovery_msg(now, inc, rows, hb_latest, auth_ok_since, backlog):
     opened = parse_ts(inc.get("episode_start")) or parse_ts(inc.get("opened_at"))
-    fresh = [r["id"] for r in rows if r["state"] in ("ok", "pending")]
-    recent = sorted([(hb_latest[t], t) for t in hb_latest if t in dict((r["id"], 1) for r in rows)],
-                    reverse=True)[:3]
+    cause = inc.get("opened_verdict") or inc.get("auth_verdict") or "unknown"
     lines = []
-    lines.append("*[fleet-watchdog] Recovered* — %d of %d routines fresh again, %s."
-                 % (len(fresh), len(ROUTINES), fmt(now)))
+    lines.append("*[fleet-watchdog] Recovered* — scheduled runs are working again, %s." % fmt(now))
     lines.append("")
     if opened and (now - opened).total_seconds() > 0:
         lines.append("Outage ran *%s* (%s → %s), cause `%s`, %d alert%s sent."
-                     % (human_delta(now - opened), fmt(opened), fmt(now),
-                        inc.get("auth_verdict") or inc.get("kind") or "unknown",
+                     % (human_delta(now - opened), fmt(opened), fmt(now), cause,
                         inc.get("alert_count", 0), "" if inc.get("alert_count", 0) == 1 else "s"))
-    if recent:
-        lines.append("First back: " + " · ".join("%s %s" % (t, ts.strftime("%-I:%M %p")) for ts, t in recent))
+    # Only heartbeats AFTER the recovery moment are evidence of "back" -- listing
+    # pre-outage timestamps here would read as if dead routines had returned.
+    if auth_ok_since is not None:
+        back = sorted(((ts, t) for t, ts in hb_latest.items() if ts >= auth_ok_since), reverse=True)
+        if back:
+            lines.append("*Confirmed running:* " + " · ".join(
+                "%s %s" % (t, ts.strftime("%-I:%M %p")) for ts, t in back[:4]))
+    if backlog:
+        lines.append("")
+        lines.append("*%d routine%s still carry missed fires from the outage* — this is expected "
+                     "backlog, not a new fault. Each clears on its own when it next runs: %s"
+                     % (len(backlog), "" if len(backlog) == 1 else "s", " · ".join(backlog[:6])
+                        + (" +%d more" % (len(backlog) - 6) if len(backlog) > 6 else "")))
+        lines.append("_Weekly jobs (brain review, saltwater report) wait for their next weekday slot._")
     lines.append("")
     lines.append("Backfill is *not* automatic — skipped runs stay skipped.")
     return "\n".join(lines)
@@ -668,20 +735,22 @@ def main():
 
     hb_latest, hb_newest = read_heartbeats(hb_path, upto=now)
 
-    rows, fleet_silent = assess(now, ticks, hb_latest, hb_newest)
     auth = scan_auth(logdir, now)
+    auth_ok_since = auth["newest_recovery"] if auth["verdict"] == "AUTH_OK" else None
+    rows, fleet_silent = assess(now, ticks, hb_latest, hb_newest, auth_ok_since)
     running = claude_running()
 
     stale = sorted(r["id"] for r in rows if r["state"] == "stale" and not r["weak"])
     weak_stale = sorted(r["id"] for r in rows if r["state"] == "stale" and r["weak"])
+    backlog = sorted(r["id"] for r in rows if r["state"] == "backlog")
 
     bad = bool(stale) or fleet_silent or auth["verdict"] in ("AUTH_BLOCKED", "AUTH_WARN")
     kind = "auth" if auth["verdict"] in ("AUTH_BLOCKED", "AUTH_WARN") else ("stale" if bad else "none")
     signature = json.dumps([kind, auth["verdict"], stale], sort_keys=True)
 
-    logf("tick now=%s verdict=%s stale=%d weak=%d fleet_silent=%s claude_running=%s log_files=%d"
-         % (now.isoformat(), auth["verdict"], len(stale), len(weak_stale), fleet_silent, running,
-            auth["files_read"]))
+    logf("tick now=%s verdict=%s stale=%d weak=%d backlog=%d fleet_silent=%s claude_running=%s log_files=%d"
+         % (now.isoformat(), auth["verdict"], len(stale), len(weak_stale), len(backlog), fleet_silent,
+            running, auth["files_read"]))
 
     inc = st.get("incident", {"state": "none"})
     outcome = "clean"
@@ -693,6 +762,7 @@ def main():
                if kind == "auth" else
                render_stale_msg(now, auth, rows, stale, weak_stale, running))
         inc = {"state": "open", "kind": kind, "auth_verdict": auth["verdict"],
+               "opened_kind": kind, "opened_verdict": auth["verdict"],
                "stale_set": stale, "signature": signature,
                "opened_at": now.isoformat(),
                "episode_start": auth["episode_start"].isoformat() if auth["episode_start"] else None,
@@ -735,7 +805,7 @@ def main():
         inc["stale_set"] = sorted(set(stale) | prev_stale) if not widened else stale
         inc["signature"] = signature
     elif (not bad) and inc.get("state") == "open":
-        msg = render_recovery_msg(now, inc, rows, hb_latest)
+        msg = render_recovery_msg(now, inc, rows, hb_latest, auth_ok_since, backlog)
         is_recovery = True
 
     # Hard spam floor -- never applies to a recovery or a failed-delivery retry.

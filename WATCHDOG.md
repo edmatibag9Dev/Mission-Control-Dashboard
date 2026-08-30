@@ -38,6 +38,18 @@ Three independent reasons it stayed invisible — the watchdog is built to defea
    alert say *"sign in again"* instead of *"things are quiet."*
    `LOG_UNREADABLE` never renders as `AUTH_OK`.
 
+   **Recovery is detected only from `Confirmed task run for:`** — emitted when a scheduled session
+   actually started, and absent for all 11 days of the outage. `clearing latched
+   session_stale_relogin failures` was tried and **rejected on evidence**: the app clears the latch
+   periodically and re-latches on the next failure, so it was the newest event for windows of up to
+   8.5 hours *during* the outage. A recovery marker newer than the newest failure overrides the 24h
+   counts, so a fix registers immediately instead of ~20h later.
+
+   **Backlog vs stale.** After a fix, routines still carry the fires they missed while auth was
+   broken. A fire due *before* the recovery moment is classified `backlog` — reported as expected,
+   never alerted, and cleared when the routine next runs. Without this the all-clear reads as a
+   second incident ("12 routines stale — no auth failure found").
+
 ## False-alarm suppression
 
 Every hourly tick is recorded, and the tick ledger doubles as evidence of **when the Mac was
