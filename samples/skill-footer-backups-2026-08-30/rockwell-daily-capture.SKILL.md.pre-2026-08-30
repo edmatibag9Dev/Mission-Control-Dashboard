@@ -1,0 +1,28 @@
+---
+name: rockwell-daily-capture
+description: Daily 6:45 PM MST: capture Rockwell options emails into Day One "Options Trading Journal" + Open Brain via the rockwell-capture skill
+---
+
+Run the `rockwell-capture` skill in **daily** mode.
+
+The skill file is at `~/.claude/skills/rockwell-capture/SKILL.md` and is the authoritative spec — follow it exactly. This prompt is a summary for orientation, not a substitute.
+
+## What this run does
+Sweep Gmail for the Rockwell options program from `rob@lightningstocks.io` (single sender, `includeTrash: true`, `newer_than:7d`, paginating on `nextPageToken` until exhausted), classify strictly by SUBJECT into four capture types — Team Meeting Recap, Trade Alert, Correction, Rockwell Note — extract, synthesize any replay video, write a Day One entry to the journal `Options Trading Journal` (exact string), verify the entry actually landed there, capture a standalone thought to Open Brain, then update state atomically and report.
+
+## Non-negotiables
+1. **State file:** `~/Documents/Claude/Rockwell-Options-Capture/state.json`. If it is missing, **STOP and warn** — never treat absence as an empty ledger; that would re-journal months of mail. Never read or write the sibling ledger at `~/Documents/Claude/Longboard-AI-Journey-Capture/state.json`.
+2. **Step 5b placement verification is mandatory.** A returned Day One UUID is NOT proof the entry landed in the requested journal (confirmed 2026-07-30). Read the UUID back from a **snapshot copy** of the Day One SQLite plus its `-wal`/`-shm` sidecars — never the live file, which can block for minutes after writes. On mismatch: do NOT retry (the write succeeded; retrying duplicates). Record and report it.
+3. **Verify incrementally**, every few entries, not all at once at the end — a large batch verified in one pass locked the database for minutes on 2026-07-31.
+4. **Unclassified is loud.** A subject matching no rule is not journaled, is NOT added to `processed_thread_ids`, and must be listed individually in the run report. This alarm is what caught the Correction and Rockwell Note types; do not weaken it into a catch-all.
+5. **Multi-leg alerts:** a single Trade Alert email routinely closes one contract and opens another. Parse every leg, not just the first.
+6. **Corrections outrank the alert they correct** and may retract a claimed win. Some corrections are merely cosmetic — read the body to tell.
+7. **Trashed threads:** discoverable but `get_thread` refuses them ("caller does not have permission"). Journal what the ~200-char snippet supports, tag `partial-trashed`, and report it so Ed can restore from Trash and re-run. Trashed *messages inside a reachable thread* are fetched normally and ARE processed.
+8. **Read-only Gmail.** Never label, archive, delete, or send.
+9. Atomic state writes: temp file then `mv`. Re-read state fresh immediately before writing.
+
+## Report at the end
+N journaled by type · dedupe-skipped · **unclassified, listed individually** · videos synthesized / needs-video · **placement verified vs mismatched** · positions opened / closed / aged out. Stamp the same summary into `last_run`.
+
+## Known backlog (do not attempt in a daily run)
+Roughly 7 June entries remain unprocessed — see the `_jun_1_15_worklist` note in state.json. They fall outside the 7-day window and will never be picked up by a daily run. They need an explicit backfill-mode run if Ed ever wants them.
