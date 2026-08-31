@@ -46,6 +46,7 @@ layer" pilot.
 | `slack_ops_poller.py` | Inbound #ops-control command poller (launchd, no Claude dependency) — `status`/`help`/`kick` handled directly, `rerun`/`ack` queued for the fleet-sentinel task. Phase 4b. |
 | `com.edmatibag.slack-ops-poller.plist` | launchd job for the poller (3-min interval; install instructions in the file header). |
 | `SCHEDULE.md` | How the daily sweep is scheduled and its runtime prerequisites. |
+| `OPS-RUNBOOK.md` | Operator runbook: the detect/repair/command system in one picture, the five Slack commands, incident playbooks by failure class, and the full rebuild appendix. |
 | `samples/` | Scrubbed samples of the gitignored runtime data. |
 | `CONTRIBUTING.md` | Commit format + README standards (canonical copy). |
 | `CHANGELOG.md` | Dated log of notable changes. |

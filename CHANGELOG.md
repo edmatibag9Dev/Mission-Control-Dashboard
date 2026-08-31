@@ -4,6 +4,17 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-08-31b] — OPS-RUNBOOK.md
+
+### Added
+- **`OPS-RUNBOOK.md`** — the operator document for the whole loop, written the day it went
+  live: system diagram, the five #ops-control commands with expected latencies and the guard
+  refusals, incident playbooks per failure class (auth outage → remote desktop; scrape
+  failure → Chrome + extension; dead launchd job → `kick`), and a rebuild appendix capturing
+  every pitfall hit during the live build (scope reinstall, private-channel scopes + invite,
+  smart-quoted tokens, TCC bash-wrapper requirement, permission prestaging).
+- README file table row pointing to it; AI-orchestration-layer README cross-links it.
+
 ## [2026-08-31] — Phase 4b: Slack remote control (#ops-control)
 
 Approved by Ed 2026-08-31 after the 8/19–8/30 outage, in which he was out of office with no
