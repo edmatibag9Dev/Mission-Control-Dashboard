@@ -87,8 +87,10 @@ def log(msg):
 
 
 def read_secret(name):
+    # Strip stray quotes too: macOS smart-quote substitution has twice wrapped
+    # a pasted token in ‘...’, which then crashes header encoding.
     try:
-        return (CONFIG / name).read_text().strip()
+        return (CONFIG / name).read_text().strip().strip("'\"‘’“”")
     except OSError:
         return None
 
@@ -118,22 +120,25 @@ def save_state(st):
 
 
 def find_channel(token):
-    cursor = None
-    for _ in range(10):
-        params = {"limit": 200, "types": "public_channel,private_channel",
-                  "exclude_archived": "true"}
-        if cursor:
-            params["cursor"] = cursor
-        r = api_call(token, "conversations.list", params)
-        if not r.get("ok"):
-            log(f"conversations.list failed: {r.get('error')}")
-            return None
-        for ch in r.get("channels", []):
-            if ch.get("name") == CHANNEL_NAME:
-                return ch["id"]
-        cursor = r.get("response_metadata", {}).get("next_cursor")
-        if not cursor:
-            break
+    # Asking for private_channel without groups:read fails the WHOLE call with
+    # missing_scope (learned 2026-08-31), so degrade to public-only rather than
+    # demanding a scope the channel may not need.
+    for types in ("public_channel,private_channel", "public_channel"):
+        cursor = None
+        for _ in range(10):
+            params = {"limit": 200, "types": types, "exclude_archived": "true"}
+            if cursor:
+                params["cursor"] = cursor
+            r = api_call(token, "conversations.list", params)
+            if not r.get("ok"):
+                log(f"conversations.list ({types}) failed: {r.get('error')}")
+                break  # try the narrower types
+            for ch in r.get("channels", []):
+                if ch.get("name") == CHANNEL_NAME:
+                    return ch["id"]
+            cursor = r.get("response_metadata", {}).get("next_cursor")
+            if not cursor:
+                return None  # listed everything visible; channel isn't there
     return None
 
 
