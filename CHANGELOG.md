@@ -4,6 +4,26 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-08-31] — Phase 4b: Slack remote control (#ops-control)
+
+Approved by Ed 2026-08-31 after the 8/19–8/30 outage, in which he was out of office with no
+way to trigger anything on this Mac. Contract: AI-orchestration-layer
+`SPEC-self-healing-loop.md` Phase 4b.
+
+### Added
+- **`slack_ops_poller.py`** + `com.edmatibag.slack-ops-poller.plist` — 3-minute launchd poller
+  (no Claude dependency) reading #ops-control for commands from Ed's user ID only. Strict
+  closed grammar: `status`/`help` answered directly, `kick` runs `launchctl kickstart` on
+  whitelisted `com.ed.*`/`com.edmatibag.*` labels, `rerun`/`ack` are queued to
+  `ORCH/runs/ops-commands.jsonl` for the hourly `fleet-sentinel` scheduled task. No free-text
+  execution path by design. Not armed until `ops-bot_token` + `ops-user_id` secrets exist.
+
+### Changed
+- **`fleet_watchdog.py` alert channel:** `ops-control` when its webhook secret exists,
+  fallback `ai-briefing` — the flip can never silence the watchdog.
+- **`SCHEDULE.md`** documents the ops-watcher/fleet-sentinel split: the watcher surfaces,
+  the sentinel repairs (Class-1, capped, dedupe-guarded); neither does the other's job.
+
 ## [2026-08-30c] — Recovery detection, found by the actual recovery
 
 Ed re-authenticated at 11:39 and `action-item-triage` ran successfully at 12:17 — the first

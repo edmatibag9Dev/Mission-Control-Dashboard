@@ -65,7 +65,13 @@ LOGDIR = HOME / "Library/Logs/fleet-watchdog"
 LAST_OK = LOGDIR / "last-ok"
 DELIVERY_FAILING = LOGDIR / "DELIVERY-FAILING"
 SLACK_ALERT = HOME / ".claude/lib/slack_alert.py"
-SLACK_CHANNEL = "ai-briefing"
+# Phase 4b (Ed, 2026-08-31): fleet-level ops alerts belong in #ops-control;
+# #ai-briefing stays the briefing routine's own domain channel. Fall back to
+# ai-briefing until the ops-control webhook secret exists, so this change can
+# never silence the watchdog — an alert with no deliverable channel is the
+# original incident with extra steps.
+_OPS_WEBHOOK = HOME / ".config/claude-alerts/ops-control_webhook"
+SLACK_CHANNEL = "ops-control" if _OPS_WEBHOOK.exists() else "ai-briefing"
 
 GRACE_DEFAULT = timedelta(minutes=120)
 AWAKE_GRACE = timedelta(minutes=60)

@@ -42,6 +42,9 @@ layer" pilot.
 |---|---|
 | `AGENTS.md` | Canonical agent guide — file map, data contract, invariants, verification gates. |
 | `watch.py` | The engine: health computation + dashboard render (stdlib only). |
+| `fleet_watchdog.py` | Out-of-band hourly liveness monitor (launchd, no Claude dependency) — alerts #ops-control (fallback #ai-briefing) on fleet silence or the auth-failure signature. |
+| `slack_ops_poller.py` | Inbound #ops-control command poller (launchd, no Claude dependency) — `status`/`help`/`kick` handled directly, `rerun`/`ack` queued for the fleet-sentinel task. Phase 4b. |
+| `com.edmatibag.slack-ops-poller.plist` | launchd job for the poller (3-min interval; install instructions in the file header). |
 | `SCHEDULE.md` | How the daily sweep is scheduled and its runtime prerequisites. |
 | `samples/` | Scrubbed samples of the gitignored runtime data. |
 | `CONTRIBUTING.md` | Commit format + README standards (canonical copy). |

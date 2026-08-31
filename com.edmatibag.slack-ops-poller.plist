@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.edmatibag.slack-ops-poller</string>
+
+  <!-- Inbound half of #ops-control (SPEC-self-healing-loop.md Phase 4b).
+       Reads Ed's commands from Slack and queues/executes them with NO Claude
+       dependency, so the remote-control path survives the exact outages it
+       exists to help fix (8/19-8/30 lesson).
+
+       Same two launchd lessons as com.edmatibag.fleet-watchdog:
+       - StartInterval, not calendar: a poller that can miss its own run
+         while the Mac is at the login screen is not a remote control.
+       - Invoked through /bin/bash: macOS TCC attaches Full Disk Access to
+         the responsible process; /bin/bash holds the grant, python3 does not.
+
+       Armed only when ~/.config/claude-alerts/ops-bot_token and ops-user_id
+       exist; until then every tick logs "not armed" and exits 0.
+
+       Install:   cp com.edmatibag.slack-ops-poller.plist ~/Library/LaunchAgents/
+                  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.edmatibag.slack-ops-poller.plist
+       Kick:      launchctl kickstart -k gui/$(id -u)/com.edmatibag.slack-ops-poller
+       Uninstall: launchctl bootout gui/$(id -u)/com.edmatibag.slack-ops-poller -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>exec /usr/bin/python3 "/Users/edmatibag/Documents/Claude/Projects/Mission-Control-Dashboard/slack_ops_poller.py"</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>/Users/edmatibag</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>TZ</key><string>America/Los_Angeles</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/edmatibag/Documents/Claude/Projects/Mission-Control-Dashboard</string>
+
+  <key>StartInterval</key>
+  <integer>180</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>5</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/edmatibag/Library/Logs/slack-ops-poller/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/edmatibag/Library/Logs/slack-ops-poller/launchd.err.log</string>
+</dict>
+</plist>
