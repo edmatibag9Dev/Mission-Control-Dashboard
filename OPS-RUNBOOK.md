@@ -81,8 +81,22 @@ The claude.ai limits scrape needs Chrome running with the Claude extension conne
 Mac. Fix: open Chrome + extension, then `rerun claude-token-dashboard-update` (or let the
 6:10 PM run / 7:26 PM sentinel retry). The burn side (ingest, reconciliation) is independent
 and usually healthy — the failure alert says which side broke.
+**Fix path verified same day:** the 1:21 PM rerun failed on the closed scrape; with Chrome +
+extension open, the scheduled 6:10 PM run succeeded first-try (stamp 6:15 PM, 154/154).
 
-### 3.5 Sentinel or poller misbehaving
+### 3.5 A wave of MISSED verdicts that are all false
+**Signature:** many routines flagged MISSED at once, but their heartbeats and live
+`lastRunAt` say they ran; sentinel skips everything with `skipped-already-landed`.
+**Cause (hit live at the first 20:00 sweep, 2026-08-31):** `watch.py` reads
+`runs/scheduled-tasks-snapshot.json`, and a sweep ran it against a snapshot ~12h old, so
+every routine that fired after 08:05 looked never-run. Guard 2 (skip-if-landed) blocked all
+8 false restarts — the layered guards are the reason this was noise, not damage.
+**Fixed structurally:** every runner (ops-watcher, fleet-sentinel) refreshes the snapshot
+immediately before invoking `watch.py`, and `watch.py` now refuses a snapshot >3h old.
+If this signature ever reappears, check which runner skipped its refresh; do not trust that
+sweep's `ops-status.json`, dashboard, or dated history archive until regenerated fresh.
+
+### 3.6 Sentinel or poller misbehaving
 Never "fix" a watcher from inside the system — surface it. Poller log:
 `~/Library/Logs/slack-ops-poller/poller.log`. Watchdog log:
 `~/Library/Logs/fleet-watchdog/watchdog.log`. Sentinel history: `runs/heartbeat.jsonl`

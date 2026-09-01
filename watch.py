@@ -585,6 +585,15 @@ def main():
     if not SNAPSHOT.exists():
         print(f"ERROR: snapshot not found at {SNAPSHOT} — write list_scheduled_tasks output there first.")
         return
+    # Fail loud on a stale snapshot instead of emitting false verdicts. Learned
+    # 2026-08-31: the fleet-sentinel's 20:00 sweep ran against the 08:05
+    # snapshot and flagged 8 routines MISSED that had all run. Every runner
+    # must refresh the snapshot immediately before invoking this engine.
+    age_h = (now.timestamp() - SNAPSHOT.stat().st_mtime) / 3600
+    if age_h > 3:
+        print(f"ERROR: snapshot is {age_h:.1f}h old — refresh it (list_scheduled_tasks → "
+              f"{SNAPSHOT}) before running. Refusing to compute verdicts from stale data.")
+        return
     tasks = json.loads(SNAPSHOT.read_text())
     heartbeats = read_heartbeats()
     assessed = [assess(t, now, heartbeats) for t in tasks]

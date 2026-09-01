@@ -4,6 +4,24 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-08-31c] — Stale-snapshot guard, found by the first 20:00 sweep
+
+The sentinel's first evening sweep ran `watch.py` against the 08:05 snapshot and got 8 false
+MISSED verdicts; guard 2 (skip-if-landed) correctly blocked all 8 restarts, and the sentinel
+diagnosed the cause itself and escalated. No routine was actually missed.
+
+### Fixed
+- **`watch.py` refuses a snapshot older than 3h** with an explicit refresh instruction —
+  false verdicts become a loud error instead. Runners must refresh
+  `runs/scheduled-tasks-snapshot.json` immediately before invoking the engine.
+- **fleet-sentinel Step 3** (runtime SKILL + ORCH backup) now refreshes the snapshot via
+  `list_scheduled_tasks` before running `watch.py` — same as ops-watcher Step 1.
+- Regenerated tonight's poisoned artifacts from a fresh snapshot: `ops-status.json`,
+  `mission-control.html`, and the dated `history/ops-status-2026-08-31.json` now carry the
+  true verdicts (15 OK, 0 missed).
+- OPS-RUNBOOK §3.5 documents the false-MISSED-wave signature; §3.4 records the verified
+  chrome-scrape fix path (6:10 PM run succeeded with Chrome + extension open).
+
 ## [2026-08-31b] — OPS-RUNBOOK.md
 
 ### Added
