@@ -1,6 +1,6 @@
 # Fleet Watchdog
 
-Out-of-band liveness monitor for the 15 enabled Claude scheduled routines.
+Out-of-band liveness monitor for the 16 enabled Claude scheduled routines (15 originally; `saltwater-multiday-refresh` registered 2026-09-04).
 Runs on launchd. **Requires no Claude session and no Claude auth**, by design.
 
 ## Why it exists

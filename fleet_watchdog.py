@@ -119,6 +119,10 @@ ROUTINES = [
     ("evening-digest",                 "5 19 * * *",   120, [(HB, None),
                                                              (MW, ORCHESTRATION / "runs" / "digest.jsonl")]),
     ("token-dashboard-sentinel",       "20 19 * * *",  120, [(HB, None)]),
+    # saltwater-multiday-refresh registered 2026-09-04 (BUILD-PLAN-multiday §10.4). The task
+    # touches data/last-success only after a verified push, so the mtime is a solid proxy.
+    ("saltwater-multiday-refresh",     "15 8 * * 0",   240, [(HB, None),
+                                                             (MT, HOME / "Documents/Claude/Projects/Build Saltwater Trip Planner/repo/data/last-success")]),
 ]
 # Deliberately excluded: freshwater-trip-log (manual), open-brain-wiki-update
 # (disabled), earnings-put-t1-recheck (disabled).
