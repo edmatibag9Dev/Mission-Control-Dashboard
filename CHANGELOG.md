@@ -4,6 +4,12 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-09-04]
+
+### Added
+- **STALLED verdict in `watch.py`** — a routine whose `lastRunAt` shows a fire but with no heartbeat for that fire after 2 h (`STALL_GRACE`) is marked `stalled` (red badge, sorted with missed/failed). Motivated by 2026-09-02: longboard, mastermind, and rockwell hung on a uv + macOS TCC prompt and scored "ok" because `lastRunAt` was set. Guarded on prior heartbeat history so footer-less routines cannot false-alarm.
+- `saltwater-multiday-refresh` added to the "Personal" routine group.
+
 ## [2026-08-31c] — Stale-snapshot guard, found by the first 20:00 sweep
 
 The sentinel's first evening sweep ran `watch.py` against the 08:05 snapshot and got 8 false

@@ -43,6 +43,15 @@ HTML_OUT = ROOT / "mission-control.html"
 
 RUN_GRACE = timedelta(minutes=45)   # allowance past fire+jitter before a run counts as missed
 LATE_SLACK = timedelta(seconds=120)  # lastRunAt may precede the matched fire minute slightly
+# A routine that fired but never wrote a heartbeat is STALLED — almost always
+# parked on an interactive approval nobody is present to answer. Observed
+# 2026-09-02: longboard/mastermind/rockwell fired 18:09-18:52, hung on a uv +
+# macOS TCC prompt, and drained only when Ed reached the machine at 08:05 the
+# next morning. The 20:18 sweep scored all three "ok" because lastRunAt was
+# set. lastRunAt means DISPATCHED, never COMPLETED — only a heartbeat means
+# completed. Grace is generous: the longest legitimate routine (the morning
+# briefing) runs well under an hour.
+STALL_GRACE = timedelta(hours=2)     # fired, but silent this long => stalled
 
 # Routine groups — Ed's locked spec 2026-07-28. Unlisted taskIds land in "Other".
 GROUPS = [
@@ -53,7 +62,7 @@ GROUPS = [
     ("Open Brain", ["substack-inbox-watcher", "action-item-triage", "open-brain-wiki-update", "weekly-brain-review"]),
     ("Token Dashboards", ["claude-token-dashboard-update", "token-dashboard-sentinel"]),
     ("Ops & System", ["ops-watcher", "evening-digest"]),
-    ("Personal", ["weekly-saltwater-fishing-report", "freshwater-trip-log"]),
+    ("Personal", ["weekly-saltwater-fishing-report", "saltwater-multiday-refresh", "freshwater-trip-log"]),
 ]
 
 # launchd script jobs. Evidence rules per job (see check_script_jobs):
@@ -228,6 +237,17 @@ def assess(task: dict, now: datetime, heartbeats=None) -> dict:
         if hb and hb[0] >= expected - LATE_SLACK and hb[1] in ("failed", "partial"):
             out["status"] = hb[1]
             out["detail"] = f"run started {fmt(last, now)} but self-reported {hb[1]}: {hb[2]}"
+        elif hb is not None and hb[0] < expected - LATE_SLACK and now > last + STALL_GRACE:
+            # Fired, but no heartbeat for THIS fire and the grace has elapsed.
+            # Guarded on `hb is not None`: a task that has never reported keeps
+            # the old neutral-absence treatment, so this cannot false-alarm on a
+            # routine that simply lacks a footer. All 17 enabled recurring tasks
+            # had heartbeat history when this was added (2026-09-03).
+            silent_h = (now - last).total_seconds() / 3600
+            out["status"] = "stalled"
+            out["detail"] = (f"fired {fmt(last, now)} but wrote no heartbeat — "
+                             f"silent {silent_h:.1f}h; last report was "
+                             f"{fmt(hb[0], now)}. Suspect an unanswered approval prompt.")
     elif now <= expected + jitter + RUN_GRACE:
         out["status"] = "pending"
         out["detail"] = f"fire window open (due {expected.strftime('%-I:%M %p')}, jitter+grace not elapsed)"
@@ -350,6 +370,7 @@ BADGE = {
     "up":        ("#15803D", "#2E9E5B", "Up"),
     "pending":   ("#2B6CB0", "#2B6CB0", "In window"),
     "missed":    ("#B91C1C", "#D64545", "Missed"),
+    "stalled":   ("#B91C1C", "#D64545", "Stalled"),
     "failed":    ("#B91C1C", "#D64545", "Failed"),
     "down":      ("#B91C1C", "#D64545", "Down"),
     "stale":     ("#B91C1C", "#D64545", "Stale"),
@@ -363,7 +384,7 @@ BADGE = {
     "scheduled": ("#2B6CB0", "#2B6CB0", "Scheduled"),
 }
 
-BAD_ROUTINE = ("missed", "failed")
+BAD_ROUTINE = ("missed", "failed", "stalled")
 WARN_ROUTINE = ("partial", "off", "note")
 BAD_JOB = ("failed", "stale")
 BAD_SERVER = ("down", "stale")
@@ -395,7 +416,7 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
                + sum(1 for s in servers if s["status"] == "stale"))
     n_queue = digest_counts.get("new", 0) + digest_counts.get("expiring", 0)
 
-    order = {"missed": 0, "failed": 0, "partial": 1, "pending": 2, "off": 3, "note": 3, "new": 4, "ok": 5, "manual": 6}
+    order = {"missed": 0, "failed": 0, "stalled": 0, "partial": 1, "pending": 2, "off": 3, "note": 3, "new": 4, "ok": 5, "manual": 6}
 
     def routine_rows(tasks):
         rows = []
