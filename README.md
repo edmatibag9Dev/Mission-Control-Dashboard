@@ -108,3 +108,7 @@ update `samples/` instead when a shape changes.
 
 ---
 *Last updated: 2026-07-28*
+
+### STALLED verdict (added 2026-09-03, committed 2026-09-04)
+
+`watch.py` marks a routine **stalled** when `lastRunAt` shows it fired but no heartbeat arrived for that fire within 2 hours (`STALL_GRACE`). `lastRunAt` proves dispatch, never completion; only a heartbeat proves completion. Stalled is alert-only: the fleet-sentinel never auto-restarts it, because the run may have finished its real work and merely failed to report. Guarded on prior heartbeat history, so a routine that has never written a footer is not flagged.
