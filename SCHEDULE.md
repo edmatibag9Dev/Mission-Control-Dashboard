@@ -10,12 +10,16 @@
   AI-orchestration-layer/ESCALATION-POLICY.md (urgent → one webhook message to #ops-control,
   DM fallback until that webhook exists; noteworthy → Lane-2 digest rows; healthy → dashboard
   update only). It surfaces, never repairs — restarts belong to `fleet-sentinel`.
+  After `watch.py` it runs `python3 morning_page.py`, which renders `morning-page.html` (the
+  one-screen Morning Page) from the files just written — read-only, no Slack, no model.
 - **Task:** `fleet-sentinel` — hourly companion, cron `12 6-21 * * *` (Phase 4b, 2026-08-31).
   Every run drains `ORCH/runs/ops-commands.jsonl` (Ed's `rerun`/`ack` commands, queued by
   `slack_ops_poller.py` from #ops-control); at the 9 AM and 8 PM windows it also runs
   `watch.py` and auto-restarts Class-1 failures. Guards: skip if today's work already landed,
   max 2 restarts/routine/day, Class-1 only, briefing never after noon, 3-in-7-days tripwire.
   Ledger: `ORCH/runs/repair.jsonl` (append-only).
+  In the two sweep hours it also re-renders `morning-page.html` after `watch.py`; the 8 PM pass is
+  the one that carries that day's token-burn numbers (Token Burn lands at 6 PM).
 
 ## Runtime prerequisites
 

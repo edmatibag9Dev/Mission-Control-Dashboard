@@ -4,6 +4,36 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-09-06] — Morning Page
+
+### Added
+- **`morning_page.py`** — a read-only, stdlib-only renderer that writes one file, `morning-page.html`:
+  a one-screen morning summary over Mission Control, the Claude Token Command Center, and the Token
+  Burn Dashboard. Sections: verdict line, six computed summary bullets, today's-fires timeline (every
+  routine and launchd job firing today with ran / due / missed / upcoming state and a NOW marker),
+  Needs a look (Broken / Degraded / Heads-up items linking to the routine's anchor on Mission Control),
+  Alerts to review (open Lane-2 digest items + Slack alert-channel links), Fleet tile, Claude plan
+  gauges (amber ≥50%, red ≥80%), token burn by vendor with a 7-day stacked chart and a 7-day
+  API-equivalent cost column, and an Open-the-source footer. No model in the loop: the bullets are
+  computed from the numbers, so the page renders with the Claude app closed.
+- Anchor ids on Mission Control: every routine row (`id="<taskId>"`) and the attention, jobs,
+  servers, and digest sections — targets for the Morning Page's links.
+- `samples/sample.morning-page.local.json` — shape of the gitignored Slack workspace/channel-id
+  config the Morning Page reads for its channel links.
+- Runner hooks (runtime SKILL.md masters, Lane-3 change approved by Ed 2026-09-06): `ops-watcher`
+  step 3 and `fleet-sentinel` sweep hours run `python3 morning_page.py` right after `watch.py`.
+
+### Constraint (Ed, 2026-09-06)
+- Every routine keeps producing its own HTML, alerts, and summaries untouched. The Morning Page only
+  reads: `ops-status.json`, the task snapshot, `heartbeat.jsonl`, the digest queue, `daily-burn.json`,
+  `sessions.json`, `chatgpt-export-meta.json`, and the `USAGE_SUMMARY` block in the Command Center.
+
+### Known gaps
+- OpenAI cost shows `n/a`: `sessions.json` carries no Codex or ChatGPT cost rows (pricing there is
+  Anthropic-only). Adding those belongs to the Token Burn Dashboard repo, not here.
+- Slack per-channel alert counts are Phase 2 — the ops bot is only in #ops-control today. Rows show
+  the channel link and "not read yet".
+
 ## [2026-09-04]
 
 ### Added

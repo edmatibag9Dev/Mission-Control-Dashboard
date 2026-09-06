@@ -22,6 +22,7 @@ noticing an absent Slack ping.**
 | `README.md` | yes | Human quickstart. |
 | `llms.txt` | yes | Machine-readable index. |
 | `watch.py` | yes | The whole engine: routine health calc, launchd checks, server probes, dashboard render. |
+| `morning_page.py` | yes | **Read-only** one-screen Morning Page renderer: bullet summary, today's fires timeline, needs-a-look, alerts, fleet, Claude plan limits, token burn by vendor (+7-day cost). Reads `ops-status.json`, the snapshot, heartbeats, the digest queue, the Token Burn JSON files, and the Command Center's `USAGE_SUMMARY`; writes only `morning-page.html`. |
 | `fleet_watchdog.py` | yes | **Out-of-band** liveness monitor run by launchd, NOT by Claude. Judges routine health from work artifacts + the Claude app log; never from `lastRunAt`. See `WATCHDOG.md`. |
 | `WATCHDOG.md` | yes | Why the fleet watchdog exists (the 2026-08-19 outage), how it detects, and how to operate/test it. |
 | `runs/watchdog-state.json` | **no (gitignored)** | Fleet-watchdog dedup state + awake-tick ledger. |
@@ -30,6 +31,8 @@ noticing an absent Slack ping.**
 | `CHANGELOG.md` | yes | Dated change log. |
 | `samples/` | yes | Scrubbed samples of the gitignored runtime data so the repo previews. |
 | `mission-control.html` | **no (gitignored)** | Generated dashboard — rebuilt by every run; never hand-edit. |
+| `morning-page.html` | **no (gitignored)** | Generated Morning Page — rebuilt after every `watch.py` run; never hand-edit. |
+| `runs/morning-page.local.json` | **no (gitignored)** | Slack workspace + channel ids for the Morning Page's channel links. Sample in `samples/`. |
 | `runs/` | **no (gitignored)** | Runtime data: task snapshot, heartbeats, ops-status, dated history archives. |
 
 External dependencies (read, never owned here):
@@ -65,6 +68,11 @@ Invariants an agent must preserve:
 2. Heartbeat **absence is neutral** — never treat a missing heartbeat as failure.
 3. Routine statuses come only from `watch.py`'s computation — agents never hand-assign health.
 4. `mission-control.html` is generated — edits go in `render_html()`, never the artifact.
+7. `morning_page.py` is read-only over every source and writes only `morning-page.html`. It must never
+   write to `ops-status.json`, `mission-control.html`, the token dashboards, or any routine's output —
+   the routines keep producing their own HTML, alerts, and summaries untouched (Ed, 2026-09-06).
+8. Slack channel ids live only in `runs/morning-page.local.json` (gitignored); the committed script
+   carries channel *names* only.
 5. The tokenburn pair's health keys off the **last-success stamp**, never watchdog log mtime
    (the watchdog is silent by design when healthy).
 6. Remote-server `unreachable` is amber and never escalates alone; reachable-but-stale content is red.
@@ -81,6 +89,10 @@ Invariants an agent must preserve:
    attention list, >26h staleness banner).
 3. The watcher agent routes the printed summary per the escalation policy: urgent → one Slack DM to
    Ed; noteworthy → Lane-2 digest rows; healthy → dashboard only.
+4. `python3 morning_page.py` (same runners, right after `watch.py`: ops-watcher 8:04 AM, fleet-sentinel
+   9 AM and 8 PM sweeps) renders `morning-page.html` from the files step 2 just wrote plus the Token
+   Burn JSON and the Command Center's `USAGE_SUMMARY` block. Summary bullets are computed from the
+   numbers — no model in the loop — so the page renders even when the Claude app is closed.
 
 ## How to extend
 
@@ -90,6 +102,9 @@ Invariants an agent must preserve:
 - **New server:** add to `SERVERS` (`kind: "port"` local, `kind: "http"` with `max_age_h` + `remote`).
 - **New status:** add to `BADGE` and, if it affects escalation, to `BAD_*` tuples.
 - **Layout:** all HTML/CSS lives in `render_html()`; brand tokens are inlined per Ed's brand guide.
+- **Morning Page:** timeline short names in `NAMES`, folded multi-fire routines in `FOLD`, launchd
+  timeline cells in `TIMELINE_LAUNCHD`, footer links in `SOURCE_LINKS`, channel names in
+  `ALERT_CHANNELS` (ids in the local config). Layout lives in `render()` of `morning_page.py`.
 
 > ⛔ `watch.py` must stay dependency-free (stdlib only) and must never hang: every network probe
 > carries a timeout, and the script always exits 0 — the watcher agent interprets the summary.
@@ -108,6 +123,8 @@ Invariants an agent must preserve:
 1. `python3 watch.py` exits 0 and prints ROUTINES / SCRIPT-JOBS / SERVERS / DIGEST / ESCALATE lines.
 2. `runs/ops-status.json` parses and `summary` counts match the printed lines.
 3. `mission-control.html` opens with no missing sections (groups, script jobs, servers, digest, retired).
+3b. `python3 morning_page.py` exits 0, prints a MORNING-PAGE line with no unexpected `gaps:`, and
+   `morning-page.html` opens with summary, timeline, needs-a-look, alerts, fleet, plan, burn, links.
 4. A synthetic failed heartbeat for a routine that ran flips it to FAILED and sets
    ESCALATE-CANDIDATE: YES (then remove the synthetic row).
 5. `git status --short` shows no `runs/` or `mission-control.html` entries staged.

@@ -2,6 +2,7 @@
 
 # The rendered dashboard (rebuilt every run; embeds real schedules and finding texts)
 /mission-control.html
+/morning-page.html
 
 # Runtime data: task snapshot, heartbeats, ops-status, dated history archives
 runs/

@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to runs/morning-page.local.json (gitignored). Channel ids come from Slack channel details; workspace is the subdomain before .slack.com.",
+  "slack_workspace": "your-workspace",
+  "channels": {
+    "ops-control": "C0XXXXXXXXX",
+    "token-dashboard-alerts": "C0XXXXXXXXX",
+    "ai-briefing": "C0XXXXXXXXX",
+    "put-earnings-scanner": "C0XXXXXXXXX",
+    "fishing-report-alerts": "C0XXXXXXXXX",
+    "open-brain-review": "C0XXXXXXXXX"
+  }
+}

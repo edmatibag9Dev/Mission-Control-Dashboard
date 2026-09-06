@@ -422,7 +422,7 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
         rows = []
         for t in sorted(tasks, key=lambda x: (order.get(x["status"], 7), x["taskId"])):
             rows.append(
-                f'<tr><td>{badge(t["status"])}</td>'
+                f'<tr id="{esc(t["taskId"])}"><td>{badge(t["status"])}</td>'
                 f'<td class="tname"><strong>{esc(t["taskId"])}</strong>'
                 f'<div class="tdetail">{esc(t["detail"])}</div></td>'
                 f'<td class="sched">{esc(t["schedule"])}</td>'
@@ -481,7 +481,7 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
                  for x in attention]
         lines += [f'<li><strong>digest item aging</strong> — {esc(i["text"])[:140]} (day {i["age_days"]})</li>'
                   for i in aging]
-        attention_html = '<section><h2>Needs attention</h2><ul class="attn">' + "\n".join(lines) + "</ul></section>"
+        attention_html = '<section id="attention"><h2>Needs attention</h2><ul class="attn">' + "\n".join(lines) + "</ul></section>"
 
     digest_rows = "\n".join(
         f'<tr><td class="mono">{esc((i["ts"] or "")[:10])}</td>'
@@ -571,13 +571,13 @@ ops-watcher may not have run. Check the Scheduled panel or run <span class="mono
 {''.join(cards)}
 </div></section>
 
-<section><h2>Script jobs (launchd)</h2>
+<section id="jobs"><h2>Script jobs (launchd)</h2>
 <div class="tablewrap"><table><tbody>{job_rows}</tbody></table></div></section>
 
-<section><h2>Servers</h2>
+<section id="servers"><h2>Servers</h2>
 <div class="servers">{server_spans}</div></section>
 
-<section><h2>Digest queue (Lane 2)</h2>
+<section id="digest"><h2>Digest queue (Lane 2)</h2>
 <div class="tablewrap"><table>
 <thead><tr><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em;padding:8px 8px 8px 0">Filed</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Age</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Severity</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Category</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Item</th></tr></thead>
 <tbody>{digest_rows}</tbody></table></div>

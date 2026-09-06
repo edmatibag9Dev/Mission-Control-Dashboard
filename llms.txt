@@ -11,6 +11,7 @@
 
 ## Engine
 - [watch.py](watch.py): the whole engine — routine/job/server health + mission-control.html render.
+- [morning_page.py](morning_page.py): read-only one-screen Morning Page over ops-status + token burn + plan limits; writes only morning-page.html.
 - [samples/](samples/): scrubbed samples of the gitignored runtime data shapes.
 
 ## Scheduling
@@ -21,4 +22,5 @@
 - Health comes from watch.py's computation only; agents never hand-assign statuses.
 - tokenburn health keys off the last-success stamp — watchdog log silence is healthy, not stale.
 - Remote-server unreachable = amber, never an escalation alone; reachable-but-stale = red.
-- mission-control.html and runs/ are generated/runtime — never committed, never hand-edited.
+- mission-control.html, morning-page.html and runs/ are generated/runtime — never committed, never hand-edited.
+- morning_page.py never writes to any source it reads; routines keep their own outputs untouched.
