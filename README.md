@@ -101,7 +101,7 @@ constants at the top of `watch.py`.
 - `runs/heartbeat.jsonl` — appended by each routine's attention-layer footer.
 - `~/Documents/Claude/Projects/AI-orchestration-layer/runs/digest.jsonl` — the Lane-2 queue (owned by
   ESCALATION-POLICY.md there; read-only view here).
-- launchd evidence: `~/Library/Logs/tokenburn/last-success`, `~/Open-Brain/.digest.log`, the earnings
+- launchd evidence: `~/Library/Logs/tokenburn/last-success`, `~/Open-Brain/.digest.log`, heartbeat rows for the three earnings-put launchd jobs (`earnings-put-weekly-scan`, `-daily-scan`, `-weekly-report`, since 2026-09-10), the earnings
   screener's `_launchd_scan.log`.
 - Morning Page only (all read-only): `~/Documents/Claude/Projects/Token Burn Dashboard/daily-burn.json`
   (tokens by source per day; Claude = Cowork + Claude Code, OpenAI = Codex exact + ChatGPT estimated,

@@ -95,14 +95,20 @@ MW = "MTIME_WEAK"  # file mtime, but shared/ambiguous -> annotate, never alone-t
 # (task_id, cron, grace_minutes, [(kind, path_or_None), ...])
 ROUTINES = [
     ("substack-inbox-watcher",         "0 4 * * *",    120, [(HB, None)]),
-    ("earnings-put-am-recheck",        "0 7 * * 1-5",  120, [(HB, None)]),
+    # earnings-put screener v2.0 (2026-09-10): the scans run under launchd and
+    # write their own heartbeats on EVERY exit path, incl. the season-off SKIP
+    # (exit 64) — so a heartbeat is always due at the slot, in or out of season.
+    # The three share one log file (MW), which is why HB is the real evidence.
+    ("earnings-put-daily-scan",        "45 6 * * 1-5", 120, [(HB, None),
+                                                             (MW, HOME / "Library/Logs/earnings-put-screener/scan.log")]),
     ("daily-ai-morning-briefing",      "45 7 * * *",   180, [(HB, None)]),
     ("ops-watcher",                    "0 8 * * *",    120, [(HB, None), (MT, ROOT / "runs" / "ops-status.json")]),
     ("weekly-brain-review",            "0 8 * * 0",    240, [(HB, None)]),
     ("weekly-saltwater-fishing-report","0 9 * * 5",    240, [(HB, None)]),
-    ("earnings-put-pxo-capture",       "30 11 * * 1-5",150, [(HB, None)]),
     ("earnings-put-weekly-scan",       "0 12 * * 5",   180, [(HB, None),
-                                                             (MT, HOME / "Documents/Claude/earnings-put-screener/output/_launchd_scan.log")]),
+                                                             (MW, HOME / "Library/Logs/earnings-put-screener/scan.log")]),
+    ("earnings-put-weekly-report",     "0 14 * * 5",   180, [(HB, None)]),
+    ("earnings-put-trade-capture",     "0 14 * * 1-5", 150, [(HB, None)]),
     ("action-item-triage",             "15 12 * * *",  120, [(HB, None)]),
     ("longboard-daily-capture",        "0 18 * * *",   180, [(HB, None)]),
     ("claude-token-dashboard-update",  "10 18 * * *",  120, [(HB, None),
@@ -125,7 +131,8 @@ ROUTINES = [
                                                              (MT, HOME / "Documents/Claude/Projects/Build Saltwater Trip Planner/repo/data/last-success")]),
 ]
 # Deliberately excluded: freshwater-trip-log (manual), open-brain-wiki-update
-# (disabled), earnings-put-t1-recheck (disabled).
+# (disabled), and the RETIRED earnings-put Claude tasks — am-recheck, pxo-capture,
+# t1-recheck, and (2026-09-10) the weekly-scan task — all disabled for history.
 
 LOCAL_TZ = datetime.now().astimezone().tzinfo
 

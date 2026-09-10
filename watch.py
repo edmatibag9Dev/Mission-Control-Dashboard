@@ -56,7 +56,10 @@ STALL_GRACE = timedelta(hours=2)     # fired, but silent this long => stalled
 # Routine groups — Ed's locked spec 2026-07-28. Unlisted taskIds land in "Other".
 GROUPS = [
     ("AI Morning Briefing", ["daily-ai-morning-briefing"]),
-    ("Earnings Puts", ["earnings-put-weekly-scan", "earnings-put-t1-recheck", "earnings-put-pxo-capture"]),
+    # 2026-09-10: the screener's scans moved to launchd (see script jobs below); the
+    # one live Claude task is trade-capture. The other four are RETIRED + disabled.
+    ("Earnings Puts", ["earnings-put-trade-capture", "earnings-put-weekly-scan",
+                       "earnings-put-am-recheck", "earnings-put-t1-recheck", "earnings-put-pxo-capture"]),
     ("Longboard", ["longboard-daily-capture"]),
     ("Mastermind", ["mastermind-daily-capture"]),
     ("Open Brain", ["substack-inbox-watcher", "action-item-triage", "open-brain-wiki-update", "weekly-brain-review"]),
@@ -69,19 +72,27 @@ GROUPS = [
 #   tokenburn pair keys off the last-success stamp — the watchdog is SILENT BY DESIGN
 #   when the stamp is fresh (its log only grows on heals; log mtime is NOT health evidence).
 TOKENBURN_STAMP = Path.home() / "Library/Logs/tokenburn/last-success"
+#   A job may carry "heartbeat": <task name> instead of / as well as "evidence": the
+#   earnings-put jobs (2026-09-10, screener v2.0) write a heartbeat.jsonl row on every
+#   exit path — including the season-off SKIP (exit 64) — so the heartbeat is the
+#   freshest and most specific evidence; the three share one log file, which is why
+#   mtime alone cannot tell them apart. A failed heartbeat status marks the job failed.
 SCRIPT_JOBS_STATIC = [
     {"id": "openbrain.digest", "desc": "Open Brain digest script (run_digest.sh)",
      "schedule": "Daily 7:00 AM", "evidence": Path.home() / "Open-Brain/.digest.log", "max_age_h": 26},
-    {"id": "earnings-put-weekly-scan (py)", "desc": "Raw Python screener — stage 1 of the Sunday pipeline",
-     "schedule": "Sunday 6:00 PM",
-     "evidence": Path.home() / "Documents/Claude/earnings-put-screener/output/_launchd_scan.log", "max_age_h": 8 * 24},
+    {"id": "earnings-put-weekly-scan", "desc": "Earnings put screener — Friday weekly scan (launchd)",
+     "schedule": "Friday 12:00 PM", "heartbeat": "earnings-put-weekly-scan", "max_age_h": 8 * 24},
+    {"id": "earnings-put-daily-scan", "desc": "Earnings put screener — daily update (launchd)",
+     "schedule": "Weekdays 6:45 AM", "heartbeat": "earnings-put-daily-scan", "max_age_h": 4 * 24},
+    {"id": "earnings-put-weekly-report", "desc": "Earnings put screener — weekly + season report (launchd)",
+     "schedule": "Friday 2:00 PM", "heartbeat": "earnings-put-weekly-report", "max_age_h": 8 * 24},
 ]
 
 SERVERS = [
     {"id": "ai-briefing", "kind": "port", "port": 8765, "desc": "Morning AI Briefing site"},
     {"id": "openbrain-review-dashboard", "kind": "port", "port": 8787, "desc": "Open Brain review dashboard"},
     {"id": "earnings-put-scanner @ eds-mac-studio", "kind": "http",
-     "url": "http://eds-mac-studio.local:8080/latest.html", "max_age_h": 8 * 24, "remote": True,
+     "url": "http://eds-mac-studio.local:8080/index.html", "max_age_h": 8 * 24, "remote": True,
      "desc": "Earnings Put Screener served from the Mac Studio"},
 ]
 
@@ -286,8 +297,9 @@ def read_digest(now: datetime):
 
 # ---------------------------------------------------------------- script jobs (launchd)
 
-def check_script_jobs(now: datetime):
+def check_script_jobs(now: datetime, heartbeats=None):
     jobs = []
+    heartbeats = heartbeats or {}
 
     # tokenburn pair — health keys off the last-success stamp, not log mtimes.
     stamp_dt, age_h = None, None
@@ -316,11 +328,19 @@ def check_script_jobs(now: datetime):
                  "last": stamp_dt.isoformat() if stamp_dt else None})
 
     for j in SCRIPT_JOBS_STATIC:
-        dt = mtime_dt(j["evidence"])
+        dt = mtime_dt(j["evidence"]) if j.get("evidence") else None
+        hb = heartbeats.get(j["heartbeat"]) if j.get("heartbeat") else None
+        hb_note = ""
+        if hb and (dt is None or hb[0] > dt):
+            dt = hb[0]
+            hb_note = f" — heartbeat {hb[1]}: {hb[2][:80]}" if hb[2] else f" — heartbeat {hb[1]}"
         if dt is None:
-            st, detail = "failed", f"evidence file missing: {j['evidence']}"
+            st, detail = "failed", (f"evidence file missing: {j['evidence']}" if j.get("evidence")
+                                    else "no heartbeat yet")
+        elif hb and hb[1] == "failed" and dt == hb[0]:
+            st, detail = "failed", f"last run reported failed {fmt(dt, now)}{hb_note}"
         elif (now - dt).total_seconds() / 3600 <= j["max_age_h"]:
-            st, detail = "ok", f"last activity {fmt(dt, now)}"
+            st, detail = "ok", f"last activity {fmt(dt, now)}{hb_note}"
         else:
             st, detail = "stale", f"no activity since {fmt(dt, now)} (max {j['max_age_h']}h)"
         jobs.append({"id": j["id"], "desc": j["desc"], "schedule": j["schedule"],
@@ -619,7 +639,7 @@ def main():
     heartbeats = read_heartbeats()
     assessed = [assess(t, now, heartbeats) for t in tasks]
     digest_items, digest_counts = read_digest(now)
-    jobs = check_script_jobs(now)
+    jobs = check_script_jobs(now, heartbeats)
     servers = check_servers(now)
 
     active = [t for t in assessed if not t["oneTime"] and t["enabled"] and t["status"] != "manual"]

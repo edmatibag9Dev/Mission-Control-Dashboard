@@ -65,9 +65,11 @@ NAMES = {
     "rockwell-daily-capture": "Rockwell",
     "mastermind-daily-capture": "Mastermind",
     "evening-digest": "Evening digest",
-    "earnings-put-am-recheck": "Earnings AM recheck",
-    "earnings-put-pxo-capture": "Earnings trade log",
-    "earnings-put-weekly-scan": "Earnings weekly scan",
+    "earnings-put-trade-capture": "Earnings trade capture",
+    # retired 2026-09-09/10 (disabled; the scans moved to launchd) — names kept for history rows
+    "earnings-put-am-recheck": "Earnings AM recheck (retired)",
+    "earnings-put-pxo-capture": "Earnings trade log (retired)",
+    "earnings-put-weekly-scan": "Earnings weekly scan (retired task)",
     "weekly-saltwater-fishing-report": "Fishing report",
     "open-brain-wiki-update": "Brain wiki",
     "skills-inventory-review": "Skills review",
@@ -79,14 +81,16 @@ FOLD = {"fleet-sentinel": ({9, 20}, "restart window")}
 TIMELINE_LAUNCHD = [
     ("Token burn ingest", "tokenburn.ingest", "0 18 * * *"),
     ("Open Brain digest", "openbrain.digest", "0 7 * * *"),
-    ("Earnings weekly scan (py)", "earnings-put-weekly-scan (py)", "0 18 * * 0"),
+    ("Earnings daily update", "earnings-put-daily-scan", "45 6 * * 1-5"),
+    ("Earnings weekly scan", "earnings-put-weekly-scan", "0 12 * * 5"),
+    ("Earnings weekly report", "earnings-put-weekly-report", "0 14 * * 5"),
 ]
 SOURCE_LINKS = [
     ("Mission Control", MC_HTML.as_uri()),
     ("Claude Token Command Center", COMMAND_CENTER.as_uri()),
     ("Token Burn Dashboard", TOKEN_BURN_HTML.as_uri()),
     ("AI Briefing", "http://localhost:8765/"),
-    ("Earnings Put Screener", "http://eds-mac-studio.local:8080/latest.html"),
+    ("Earnings Put Screener", "http://eds-mac-studio.local:8080/index.html"),
     ("Open Brain review", "http://localhost:8787/"),
 ]
 # Channel names only; ids + workspace come from runs/morning-page.local.json (never committed).

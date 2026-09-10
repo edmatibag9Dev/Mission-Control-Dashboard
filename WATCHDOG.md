@@ -1,6 +1,6 @@
 # Fleet Watchdog
 
-Out-of-band liveness monitor for the 16 enabled Claude scheduled routines (15 originally; `saltwater-multiday-refresh` registered 2026-09-04).
+Out-of-band liveness monitor for the enabled Claude scheduled routines plus the earnings-put launchd jobs (15 originally; `saltwater-multiday-refresh` registered 2026-09-04; on 2026-09-10 the earnings screener's four Claude tasks were replaced by one Claude task, `earnings-put-trade-capture`, and three launchd jobs that write heartbeats on every exit path).
 Runs on launchd. **Requires no Claude session and no Claude auth**, by design.
 
 ## Why it exists

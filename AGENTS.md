@@ -43,6 +43,8 @@ External dependencies (read, never owned here):
   may append rows per the policy, never edit or deliver).
 - launchd evidence files (`~/Library/Logs/tokenburn/last-success`, `~/Open-Brain/.digest.log`,
   earnings screener `_launchd_scan.log`) and server ports/URLs configured at the top of `watch.py`.
+  Since 2026-09-10 a script job may also name a `heartbeat` task: the earnings-put launchd jobs
+  self-report to `runs/heartbeat.jsonl` on every exit path, and that row wins over file mtime.
 
 ## The data contract
 
@@ -97,8 +99,10 @@ Invariants an agent must preserve:
 ## How to extend
 
 - **New routine group / regroup:** edit `GROUPS` in `watch.py`.
-- **New launchd job:** add to `SCRIPT_JOBS_STATIC` (evidence file + `max_age_h`); jobs with bespoke
-  logic (like the tokenburn stamp pair) get a block in `check_script_jobs()`.
+- **New launchd job:** add to `SCRIPT_JOBS_STATIC` (evidence file and/or `heartbeat` task name +
+  `max_age_h`); jobs with bespoke logic (like the tokenburn stamp pair) get a block in
+  `check_script_jobs()`. Mirror it in `fleet_watchdog.py` `ROUTINES` (cron + evidence) and in
+  `morning_page.py` `TIMELINE_LAUNCHD`.
 - **New server:** add to `SERVERS` (`kind: "port"` local, `kind: "http"` with `max_age_h` + `remote`).
 - **New status:** add to `BADGE` and, if it affects escalation, to `BAD_*` tuples.
 - **Layout:** all HTML/CSS lives in `render_html()`; brand tokens are inlined per Ed's brand guide.

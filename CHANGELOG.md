@@ -4,6 +4,24 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-09-10] — Earnings put screener v2.0 coverage
+
+### Changed
+- **`watch.py`**: script jobs may carry a `heartbeat` task name; the freshest of heartbeat row and
+  evidence-file mtime is the activity time, and a `failed` heartbeat marks the job failed. Used for
+  the three earnings-put launchd jobs (`earnings-put-weekly-scan` Fri 12:00, `earnings-put-daily-scan`
+  weekdays 06:45, `earnings-put-weekly-report` Fri 14:00), which self-report on every exit path —
+  including the season-off SKIP — and share one log file, so mtime alone could not tell them apart.
+  The stale "Sunday 6:00 PM (py)" entry is gone. "Earnings Puts" group now leads with the one live
+  Claude task, `earnings-put-trade-capture`, and lists the four retired tasks (all disabled). Server
+  probe targets `index.html` (the screener's one page; `latest.html` redirects there).
+- **`fleet_watchdog.py`**: `ROUTINES` swaps the retired `earnings-put-am-recheck` and
+  `earnings-put-pxo-capture` for `earnings-put-daily-scan`, `earnings-put-weekly-report` and
+  `earnings-put-trade-capture`; the weekly scan keeps its id but is now the launchd job (heartbeat +
+  weak log mtime). Without this the watchdog would have flagged the two retired tasks stale within a day.
+- **`morning_page.py`**: timeline cells for the three launchd jobs; retired task names marked; screener
+  link → `index.html`.
+
 ## [2026-09-06] — Morning Page
 
 ### Added
