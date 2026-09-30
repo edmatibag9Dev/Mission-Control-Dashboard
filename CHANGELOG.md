@@ -4,6 +4,32 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-09-30] — Page accuracy fixes and three uncovered launchd jobs
+
+### Fixed
+- **`watch.py`**: the STALLED detail no longer asserts "Suspect an unanswered approval prompt".
+  On 2026-09-29 both stalled routines (action-item-triage, rockwell-daily-capture) had died on an
+  API 500 and a DNS failure; the scheduler's run records said "failed". The detail now names both
+  possible causes and points at the task's run history.
+- **`watch.py`**: the stale banner told the reader to run `python3 ops/watch.py`; the script lives
+  at the repo root.
+- **`watch.py`**: rockwell-daily-capture (new "Rockwell" card), fleet-sentinel and
+  skills-inventory-review (now "Ops & System") no longer fall into "Other".
+- **`watch.py`**: retired and one-time tasks no longer appear inside group cards, so the Earnings
+  Puts card reads 1/1 instead of 1/5. They stay listed in the collapsed "One-time & retired"
+  section. A disabled task that is not marked retired stays in its card and is counted separately
+  ("· 1 disabled").
+
+### Added
+- **`watch.py`**: `retired` status — a disabled task whose description opens `[RETIRED ...]` is no
+  longer flagged "verify this is intentional" every day (four earnings-put tasks).
+- **`watch.py`**: coverage for three launchd jobs that had none — `openbrain.wiki-compile`
+  (last log line must match `compile OK`), `slack-ops-poller` (state-file freshness, 6h), and
+  `openbrain.codex-session-capture` (worker freshness plus a stuck-delivery check). New `degraded`
+  job status (amber, Lane 2) for the last: on first run it found 3 captures that have failed
+  delivery ~6,000 times since 2026-09-06 while the worker looked healthy.
+- **`morning_page.py`**: understands `retired` and `degraded`; the wiki compile joins the timeline.
+
 ## [2026-09-13] — Missed first runs; taxes routine grouped
 
 ### Fixed

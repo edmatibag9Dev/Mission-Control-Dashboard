@@ -29,10 +29,15 @@ layer" pilot.
   overrides an OK computed from start-time alone, so a run that started and died still surfaces.
 - **launchd script-job checks** — each job is verified against its *own* success evidence: the
   tokenburn pair against the pipeline's `last-success` stamp (its watchdog is silent by design),
-  others against evidence-file freshness.
+  others against evidence-file freshness. A job can also require its log's last line to match a
+  success pattern (`ok_line` — the Open Brain wiki compile uses `compile OK`). Since 2026-09-30 the
+  wiki compile, the #ops-control poller, and the Codex session-capture worker are covered; the last
+  reads **Degraded** (amber) when any capture has failed delivery for over a day while the worker
+  itself keeps running.
 - **Server probes** — local port checks plus a remote HTTP HEAD of the Mac Studio screener with
   `Last-Modified` freshness; an asleep remote host shows amber, never a false red.
-- **Grouped dashboard** — 8 purpose-group cards with health rollups, script-jobs table, servers
+- **Grouped dashboard** — 9 purpose-group cards with health rollups (retired and one-time tasks
+  live only in the collapsed section at the bottom, so they never drag a card's count down), script-jobs table, servers
   strip, global attention list, Lane-2 digest queue view, and a >26h staleness banner that exposes a
   dead watcher.
 - **Morning Page** (`morning_page.py`, 2026-09-06) — a read-only one-screen summary rendered right
@@ -42,6 +47,9 @@ layer" pilot.
   gauges (amber at 50%, red at 80%), and token burn by vendor (Claude vs OpenAI, yesterday and 7 days,
   stacked daily chart, 7-day API-equivalent cost). No model writes it, so it renders with the Claude
   app closed. It never writes to any source it reads.
+- **Retired vs disabled** — a disabled task whose description opens `[RETIRED ...]` reads
+  **Retired** and is not flagged. Any other disabled task keeps the daily "verify this is
+  intentional" flag until someone records the decision in its description.
 - **Escalation-policy routing** — the daily `ops-watcher` task DMs Ed only for severity-gate issues,
   files noteworthy items to the evening digest, and stays silent on healthy days.
 
@@ -103,7 +111,10 @@ constants at the top of `watch.py`.
 - `runs/heartbeat.jsonl` — appended by each routine's attention-layer footer.
 - `~/Documents/Claude/Projects/AI-orchestration-layer/runs/digest.jsonl` — the Lane-2 queue (owned by
   ESCALATION-POLICY.md there; read-only view here).
-- launchd evidence: `~/Library/Logs/tokenburn/last-success`, `~/Open-Brain/.digest.log`, heartbeat rows for the three earnings-put launchd jobs (`earnings-put-weekly-scan`, `-daily-scan`, `-weekly-report`, since 2026-09-10), the earnings
+- launchd evidence: `~/Library/Logs/tokenburn/last-success`, `~/Open-Brain/.digest.log`,
+  `~/Open-Brain/.wiki-compile.log` (last line must read `compile OK`), `runs/ops-poller-state.json`
+  (rewritten only after a successful Slack read), `~/.codex/session-capture/logs/worker.log` and
+  `adapter.jsonl` (delivery attempt counters), heartbeat rows for the three earnings-put launchd jobs (`earnings-put-weekly-scan`, `-daily-scan`, `-weekly-report`, since 2026-09-10), the earnings
   screener's `_launchd_scan.log`.
 - Morning Page only (all read-only): `~/Documents/Claude/Projects/Token Burn Dashboard/daily-burn.json`
   (tokens by source per day; Claude = Cowork + Claude Code, OpenAI = Codex exact + ChatGPT estimated,
@@ -123,6 +134,12 @@ constants at the top of `watch.py`.
 - Session-scoped Cowork task state and cloud routines are not enumerable via any tool; the fleet was
   consolidated into the shared registry on 2026-07-28 precisely to close that gap.
 - Heartbeat coverage starts from each routine's first post-footer run; absence is treated as neutral.
+- STALLED cannot name its cause. `watch.py` sees dispatch (`lastRunAt`) and completion (heartbeat)
+  but not the scheduler's run record, so a run parked on an approval prompt and a session killed by
+  an API or network error look the same. On 2026-09-29 both stalled routines were actually API
+  deaths. The detail text lists both causes and points at the task's run history.
+- The dashboard refreshes only when a runner calls `watch.py` (8:04 AM, 9 AM, 8 PM), so between
+  sweeps it can show a routine as stalled or missed after it has since run cleanly.
 - Morning Page: OpenAI cost shows `n/a` because `sessions.json` carries no Codex or ChatGPT cost rows
   (its pricing table is Anthropic-only); adding that belongs to the Token Burn Dashboard repo.
 - Morning Page: Slack per-channel alert counts are Phase 2 — the ops bot is only in #ops-control, so
@@ -150,8 +167,8 @@ on every `feat`/`fix`/`data` commit. Runtime data and the rendered dashboard are
 update `samples/` instead when a shape changes.
 
 ---
-*Last updated: 2026-09-06*
+*Last updated: 2026-09-30*
 
 ### STALLED verdict (added 2026-09-03, committed 2026-09-04)
 
-`watch.py` marks a routine **stalled** when `lastRunAt` shows it fired but no heartbeat arrived for that fire within 2 hours (`STALL_GRACE`). `lastRunAt` proves dispatch, never completion; only a heartbeat proves completion. Stalled is alert-only: the fleet-sentinel never auto-restarts it, because the run may have finished its real work and merely failed to report. Guarded on prior heartbeat history, so a routine that has never written a footer is not flagged.
+`watch.py` marks a routine **stalled** when `lastRunAt` shows it fired but no heartbeat arrived for that fire within 2 hours (`STALL_GRACE`). `lastRunAt` proves dispatch, never completion; only a heartbeat proves completion. Stalled is alert-only: the fleet-sentinel never auto-restarts it, because the run may have finished its real work and merely failed to report. The verdict does not know *why* the heartbeat is missing — an unanswered approval prompt and a session that died on an API or network error look identical from here (see Known Limitations). Guarded on prior heartbeat history, so a routine that has never written a footer is not flagged.

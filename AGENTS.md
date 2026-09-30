@@ -78,6 +78,10 @@ Invariants an agent must preserve:
 5. The tokenburn pair's health keys off the **last-success stamp**, never watchdog log mtime
    (the watchdog is silent by design when healthy).
 6. Remote-server `unreachable` is amber and never escalates alone; reachable-but-stale content is red.
+9. `retired` (disabled + description opens `[RETIRED`) and job `degraded` are amber/grey states that
+   never escalate alone. `degraded` means the job runs but some work items are not landing.
+10. The STALLED detail must not assert a single cause — `watch.py` cannot see the scheduler's run
+    records (2026-09-29: two "approval prompt" stalls were API deaths).
 
 ## How it works (pipeline — native Mac runtime)
 

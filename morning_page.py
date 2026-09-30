@@ -80,6 +80,7 @@ FOLD = {"fleet-sentinel": ({9, 20}, "restart window")}
 # launchd jobs worth a timeline cell: (label, script_jobs id in ops-status, cron)
 TIMELINE_LAUNCHD = [
     ("Token burn ingest", "tokenburn.ingest", "0 18 * * *"),
+    ("Open Brain wiki compile", "openbrain.wiki-compile", "30 6 * * *"),
     ("Open Brain digest", "openbrain.digest", "0 7 * * *"),
     ("Earnings daily update", "earnings-put-daily-scan", "45 6 * * 1-5"),
     ("Earnings weekly scan", "earnings-put-weekly-scan", "0 12 * * 5"),
@@ -299,8 +300,10 @@ def render(ctx):
     broken = [t for t in active if t["status"] in BROKEN]
     partial = [t for t in active if t["status"] == "partial"]
     pending = [t for t in active if t["status"] == "pending"]
+    retired = [t for t in tasks if t["status"] == "retired" and not t["oneTime"]]
     off = [t for t in tasks if t["status"] == "off" and not t["oneTime"]]
     bad_jobs = [j for j in jobs if j["status"] in watch.BAD_JOB]
+    warn_jobs = [j for j in jobs if j["status"] in watch.WARN_JOB]
     bad_srv = [x for x in servers if x["status"] in watch.BAD_SERVER]
     warn_srv = [x for x in servers if x["status"] == "unreachable"]
     upcoming = []
@@ -318,7 +321,7 @@ def render(ctx):
 
     # ---- verdict
     n_bad = len(broken) + len(bad_jobs) + len(bad_srv)
-    n_warn = len(partial) + len(warn_srv) + summ.get("flags", 0)
+    n_warn = len(partial) + len(warn_srv) + len(warn_jobs) + summ.get("flags", 0)
     if n_bad:
         vcls, vhead = "red", f"{n_bad} item{'s' if n_bad > 1 else ''} need attention."
     elif n_warn:
@@ -353,8 +356,11 @@ def render(ctx):
     bl.append(r1)
     r2 = "<b>Degraded:</b> "
     d_parts = [f"<b>{esc(t['taskId'])}</b> finished partial" for t in partial]
+    d_parts += [f"<b>{esc(j['id'])}</b> degraded" for j in warn_jobs]
     if off:
-        d_parts.append(f"{len(off)} routine{'s' if len(off) > 1 else ''} disabled by design")
+        d_parts.append(f"{len(off)} routine{'s' if len(off) > 1 else ''} disabled, not marked retired")
+    if retired:
+        d_parts.append(f"{len(retired)} retired by design")
     if warn_srv:
         d_parts.append(f"{len(warn_srv)} remote server unreachable (amber)")
     bl.append(r2 + ("; ".join(d_parts) + "." if d_parts else "nothing."))
@@ -425,6 +431,8 @@ def render(ctx):
     for t in partial:
         look.append(("warn", "Degraded", f"{t['taskId']} partial", first_sentence(t["detail"], 150),
                      f"{mc}#{t['taskId']}", "open routine"))
+    for j in warn_jobs:
+        look.append(("warn", "Degraded", f"{j['id']} degraded", first_sentence(j["detail"], 150), f"{mc}#jobs", "open jobs"))
     for x in warn_srv:
         look.append(("warn", "Degraded", f"{x['id']} unreachable", first_sentence(x["detail"], 150), f"{mc}#servers", "open servers"))
     for i in open_items:
@@ -481,7 +489,7 @@ def render(ctx):
         ("Auto-restarts today", str(ctx["restarts_today"])),
         ("#ops-control commands queued", str(ctx["queued"])),
         ("Last heartbeat", f"{hb_last[0].strftime('%-I:%M %p')} {hb_last[1]}" if hb_last else "none today"),
-        ("Off / done / manual", f"{len(off)} · {sum(1 for t in tasks if t['status'] == 'done')} · {sum(1 for t in tasks if t['status'] == 'manual')}"),
+        ("Off / retired / done / manual", f"{len(off)} · {len(retired)} · {sum(1 for t in tasks if t['status'] == 'done')} · {sum(1 for t in tasks if t['status'] == 'manual')}"),
     ]
     fleet_kv_html = "\n".join(f'<span class="k">{esc(k)}</span><span></span><span class="v">{esc(v)}</span>' for k, v in fleet_kv)
 

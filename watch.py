@@ -43,8 +43,12 @@ HTML_OUT = ROOT / "mission-control.html"
 
 RUN_GRACE = timedelta(minutes=45)   # allowance past fire+jitter before a run counts as missed
 LATE_SLACK = timedelta(seconds=120)  # lastRunAt may precede the matched fire minute slightly
-# A routine that fired but never wrote a heartbeat is STALLED — almost always
-# parked on an interactive approval nobody is present to answer. Observed
+# A routine that fired but never wrote a heartbeat is STALLED. The first cases
+# were runs parked on an interactive approval nobody was present to answer, but
+# a session that dies mid-run looks identical: 2026-09-29 action-item-triage
+# (API 500 at 16s) and rockwell-daily-capture (DNS ENOTFOUND) both read STALLED
+# while the scheduler's run record said "failed". watch.py cannot see run
+# records, so the detail names the possible causes instead of guessing one. Observed
 # 2026-09-02: longboard/mastermind/rockwell fired 18:09-18:52, hung on a uv +
 # macOS TCC prompt, and drained only when Ed reached the machine at 08:05 the
 # next morning. The 20:18 sweep scored all three "ok" because lastRunAt was
@@ -54,7 +58,10 @@ LATE_SLACK = timedelta(seconds=120)  # lastRunAt may precede the matched fire mi
 STALL_GRACE = timedelta(hours=2)     # fired, but silent this long => stalled
 NEVER_RUN_LOOKBACK_DAYS = 62         # how far back a never-run task is checked for a missed first fire
 
-# Routine groups — Ed's locked spec 2026-07-28. Unlisted taskIds land in "Other".
+# Routine groups — Ed's locked spec 2026-07-28 (Rockwell card added 2026-09-30).
+# Unlisted taskIds land in "Other". Group cards show enabled recurring tasks plus
+# disabled-but-not-retired ones; retired and one-time tasks live only in the
+# collapsed "One-time & retired" section.
 GROUPS = [
     ("AI Morning Briefing", ["daily-ai-morning-briefing"]),
     # 2026-09-10: the screener's scans moved to launchd (see script jobs below); the
@@ -63,9 +70,10 @@ GROUPS = [
                        "earnings-put-am-recheck", "earnings-put-t1-recheck", "earnings-put-pxo-capture"]),
     ("Longboard", ["longboard-daily-capture"]),
     ("Mastermind", ["mastermind-daily-capture"]),
+    ("Rockwell", ["rockwell-daily-capture"]),
     ("Open Brain", ["substack-inbox-watcher", "action-item-triage", "open-brain-wiki-update", "weekly-brain-review"]),
     ("Token Dashboards", ["claude-token-dashboard-update", "token-dashboard-sentinel"]),
-    ("Ops & System", ["ops-watcher", "evening-digest"]),
+    ("Ops & System", ["ops-watcher", "evening-digest", "fleet-sentinel", "skills-inventory-review"]),
     ("Personal", ["weekly-saltwater-fishing-report", "saltwater-multiday-refresh", "freshwater-trip-log",
                   "taxes-2026-monthly-receipt-capture"]),
 ]
@@ -88,7 +96,25 @@ SCRIPT_JOBS_STATIC = [
      "schedule": "Weekdays 6:45 AM", "heartbeat": "earnings-put-daily-scan", "max_age_h": 4 * 24},
     {"id": "earnings-put-weekly-report", "desc": "Earnings put screener — weekly + season report (launchd)",
      "schedule": "Friday 2:00 PM", "heartbeat": "earnings-put-weekly-report", "max_age_h": 8 * 24},
+    # 2026-09-30: three launchd jobs that had no coverage. `ok_line` is a regex the
+    # evidence file's last non-empty line must match — mtime alone cannot tell a
+    # failed run from a good one when the job logs both.
+    {"id": "openbrain.wiki-compile", "desc": "Open Brain wiki compile (run_wiki_compile.sh)",
+     "schedule": "Daily 6:30 AM", "evidence": Path.home() / "Open-Brain/.wiki-compile.log",
+     "ok_line": r"compile OK", "max_age_h": 26},
+    # The poller rewrites its state file only after a successful Slack read, so its
+    # mtime is a success stamp. A few hours stale = Slack unreachable (DNS drops seen
+    # 2026-09-29 18:50-19:04 and 22:00-02:00), not a dead job — hence 6h, not 3 min.
+    {"id": "slack-ops-poller", "desc": "#ops-control command poller (slack_ops_poller.py)",
+     "schedule": "Every 3 min", "evidence": ROOT / "runs/ops-poller-state.json", "max_age_h": 6},
 ]
+
+# Codex session capture (launchd, every 5 min): the worker log's mtime proves it runs,
+# but items can fail delivery forever while the job looks alive — found 2026-09-30 with
+# 3 captures retried ~6,000 times since 2026-09-06. The adapter log's attempt counter
+# is the real evidence. Degraded (amber), not failed: other captures still deliver.
+CODEX_CAPTURE = Path.home() / ".codex/session-capture"
+CODEX_STUCK_ATTEMPTS = 288          # one day of 5-minute retries
 
 SERVERS = [
     {"id": "ai-briefing", "kind": "port", "port": 8765, "desc": "Morning AI Briefing site"},
@@ -242,8 +268,15 @@ def assess(task: dict, now: datetime, heartbeats=None) -> dict:
 
     expr = task.get("cronExpression")
     if not task.get("enabled"):
-        out["status"] = "off"
-        out["detail"] = "recurring task is DISABLED — verify this is intentional"
+        # A description that opens "[RETIRED ..." records the decision, so the daily
+        # "verify this is intentional" flag is noise for it.
+        if (task.get("description") or "").lstrip().upper().startswith("[RETIRED"):
+            out["status"] = "retired"
+            out["detail"] = "retired — disabled on purpose (see task description)"
+        else:
+            out["status"] = "off"
+            out["detail"] = ("recurring task is DISABLED and not marked retired — verify this is "
+                             "intentional (prefix its description with [RETIRED ...] if it is)")
         return out
     if not expr:
         if "manual" in (task.get("schedule") or "").lower():
@@ -295,7 +328,9 @@ def assess(task: dict, now: datetime, heartbeats=None) -> dict:
             out["status"] = "stalled"
             out["detail"] = (f"fired {fmt(last, now)} but wrote no heartbeat — "
                              f"silent {silent_h:.1f}h; last report was "
-                             f"{fmt(hb[0], now)}. Suspect an unanswered approval prompt.")
+                             f"{fmt(hb[0], now)}. Cause unknown from here — an unanswered "
+                             f"approval prompt, or a session that died (API or network error). "
+                             f"Check the task's latest run in the Scheduled panel.")
     elif now <= expected + jitter + RUN_GRACE:
         out["status"] = "pending"
         out["detail"] = f"fire window open (due {expected.strftime('%-I:%M %p')}, jitter+grace not elapsed)"
@@ -371,9 +406,16 @@ def check_script_jobs(now: datetime, heartbeats=None):
         if hb and (dt is None or hb[0] > dt):
             dt = hb[0]
             hb_note = f" — heartbeat {hb[1]}: {hb[2][:80]}" if hb[2] else f" — heartbeat {hb[1]}"
+        bad_line = None
+        if j.get("ok_line") and dt is not None and not hb_note:
+            last_line = last_nonempty_line(j["evidence"])
+            if last_line is not None and not re.search(j["ok_line"], last_line):
+                bad_line = last_line[-120:]
         if dt is None:
             st, detail = "failed", (f"evidence file missing: {j['evidence']}" if j.get("evidence")
                                     else "no heartbeat yet")
+        elif bad_line is not None:
+            st, detail = "failed", f"last run {fmt(dt, now)} did not report success: {bad_line}"
         elif hb and hb[1] == "failed" and dt == hb[0]:
             st, detail = "failed", f"last run reported failed {fmt(dt, now)}{hb_note}"
         elif (now - dt).total_seconds() / 3600 <= j["max_age_h"]:
@@ -382,7 +424,57 @@ def check_script_jobs(now: datetime, heartbeats=None):
             st, detail = "stale", f"no activity since {fmt(dt, now)} (max {j['max_age_h']}h)"
         jobs.append({"id": j["id"], "desc": j["desc"], "schedule": j["schedule"],
                      "status": st, "detail": detail, "last": dt.isoformat() if dt else None})
+    jobs.append(check_codex_capture(now))
     return jobs
+
+
+def last_nonempty_line(path: Path, tail_bytes: int = 4096):
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - tail_bytes))
+            lines = [l for l in f.read().decode("utf-8", "replace").splitlines() if l.strip()]
+        return lines[-1] if lines else None
+    except OSError:
+        return None
+
+
+def check_codex_capture(now: datetime):
+    row = {"id": "openbrain.codex-session-capture", "desc": "Codex session capture worker → Open Brain",
+           "schedule": "Every 5 min", "last": None}
+    dt = mtime_dt(CODEX_CAPTURE / "logs/worker.log")
+    row["last"] = dt.isoformat() if dt else None
+    if dt is None:
+        row["status"], row["detail"] = "failed", "worker.log missing — job may not be installed"
+        return row
+    if (now - dt).total_seconds() / 3600 > 1:
+        row["status"], row["detail"] = "stale", f"worker has not run since {fmt(dt, now)} (runs every 5 min)"
+        return row
+    attempts = {}
+    try:
+        with open(CODEX_CAPTURE / "logs/adapter.jsonl", "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 65536))
+            for line in f.read().decode("utf-8", "replace").splitlines():
+                try:
+                    ev = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if ev.get("event") == "delivery_failed" and ev.get("session"):
+                    attempts[ev["session"]] = ev.get("attempts") or 0
+                elif ev.get("event") == "delivered":
+                    attempts.pop(ev.get("session"), None)
+    except OSError:
+        pass
+    stuck = {k: v for k, v in attempts.items() if v >= CODEX_STUCK_ATTEMPTS}
+    if stuck:
+        worst = max(stuck.values())
+        row["status"] = "degraded"
+        row["detail"] = (f"{len(stuck)} capture(s) stuck in outbox — up to {worst:,} failed delivery "
+                         f"attempts (~{worst * 5 / 1440:.0f} days); see logs/adapter.jsonl")
+    else:
+        row["status"], row["detail"] = "ok", f"worker ran {fmt(dt, now)}; no stuck deliveries"
+    return row
 
 # ---------------------------------------------------------------- servers
 
@@ -437,6 +529,8 @@ BADGE = {
     "manual":    ("#4D5757", "#97A3A3", "On-demand"),
     "done":      ("#4D5757", "#97A3A3", "Done"),
     "off":       ("#B45309", "#E0A33E", "Disabled"),
+    "retired":   ("#4D5757", "#97A3A3", "Retired"),
+    "degraded":  ("#B45309", "#E0A33E", "Degraded"),
     "note":      ("#B45309", "#E0A33E", "Note"),
     "scheduled": ("#2B6CB0", "#2B6CB0", "Scheduled"),
 }
@@ -444,6 +538,7 @@ BADGE = {
 BAD_ROUTINE = ("missed", "failed", "stalled")
 WARN_ROUTINE = ("partial", "off", "note")
 BAD_JOB = ("failed", "stale")
+WARN_JOB = ("degraded",)
 BAD_SERVER = ("down", "stale")
 
 
@@ -460,9 +555,10 @@ def esc(s):
 def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
     by_id = {t["taskId"]: t for t in assessed}
     active = [t for t in assessed if not t["oneTime"] and t["enabled"]]
-    retired = [t for t in assessed if t["oneTime"] or not t["enabled"]]
+    retired = [t for t in assessed if t["oneTime"] or t["status"] == "retired"]
+    in_cards = {t["taskId"] for t in assessed if t not in retired}
     grouped_ids = {tid for _, ids in GROUPS for tid in ids}
-    other = [t for t in active if t["taskId"] not in grouped_ids]
+    other = [t for t in assessed if t["taskId"] in in_cards and t["taskId"] not in grouped_ids]
 
     n_sched = [t for t in active if t["status"] != "manual"]
     n_ok = sum(1 for t in n_sched if t["status"] == "ok")
@@ -473,7 +569,8 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
                + sum(1 for s in servers if s["status"] == "stale"))
     n_queue = digest_counts.get("new", 0) + digest_counts.get("expiring", 0)
 
-    order = {"missed": 0, "failed": 0, "stalled": 0, "partial": 1, "pending": 2, "off": 3, "note": 3, "new": 4, "ok": 5, "manual": 6}
+    order = {"missed": 0, "failed": 0, "stalled": 0, "partial": 1, "pending": 2, "off": 3, "note": 3, "new": 4,
+             "ok": 5, "manual": 6, "retired": 7, "done": 7}
 
     def routine_rows(tasks):
         rows = []
@@ -489,10 +586,11 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
 
     cards = []
     for gname, ids in GROUPS + ([("Other", [t["taskId"] for t in other])] if other else []):
-        gtasks = [by_id[i] for i in ids if i in by_id]
+        gtasks = [by_id[i] for i in ids if i in by_id and i in in_cards]
         if not gtasks:
             continue
-        sched = [t for t in gtasks if t["status"] != "manual"]
+        g_off = sum(1 for t in gtasks if t["status"] == "off")
+        sched = [t for t in gtasks if t["status"] not in ("manual", "off")]
         g_ok = sum(1 for t in sched if t["status"] == "ok")
         g_bad = sum(1 for t in sched if t["status"] in BAD_ROUTINE)
         g_new = sum(1 for t in sched if t["status"] == "new")
@@ -504,8 +602,12 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
             roll, rc = f"{g_ok}/{len(sched)} OK · {g_new} pending first run", "#2B6CB0"
         elif sched:
             roll, rc = f"{g_ok}/{len(sched)} OK", "#15803D"
+        elif g_off:
+            roll, rc = "disabled", "#B45309"
         else:
             roll, rc = "on-demand", "#6B7777"
+        if g_off and sched:
+            roll += f" · {g_off} disabled"
         cards.append(
             f'<div class="gcard"><div class="ghead"><h3>{esc(gname)}</h3>'
             f'<span class="roll" style="color:{rc}">{roll}</span></div>'
@@ -529,7 +631,7 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
     )
 
     attention = ([t for t in active if t["status"] in BAD_ROUTINE + WARN_ROUTINE]
-                 + [j for j in jobs if j["status"] in BAD_JOB]
+                 + [j for j in jobs if j["status"] in BAD_JOB + WARN_JOB]
                  + [s for s in servers if s["status"] in BAD_SERVER])
     aging = [i for i in digest_items if i["status"] == "expiring" or (i["age_days"] or 0) >= 12]
     attention_html = ""
@@ -612,7 +714,8 @@ footer {{ margin-top:44px; color:var(--muted); font-size:12.5px; border-top:1px 
 </header>
 
 <div id="stale-banner"><strong>This view is stale.</strong> Generated more than 26 hours ago — the
-ops-watcher may not have run. Check the Scheduled panel or run <span class="mono">python3 ops/watch.py</span>.</div>
+ops-watcher may not have run. Check the Scheduled panel, or refresh the snapshot and run
+<span class="mono">python3 watch.py</span> in the Mission-Control-Dashboard folder.</div>
 
 <div class="tiles">
   <div class="stat"><div class="n" style="color:{'#15803D' if n_bad==0 else 'var(--text)'}">{n_ok}/{len(n_sched)}</div><div class="l">routines healthy</div></div>
@@ -713,9 +816,12 @@ def main():
         print(f"  [{t['status'].upper()}] {t['taskId']} — {t['detail']}")
     for t in flags:
         print(f"  [FLAG] {t['taskId']} — {t['detail']}")
-    print(f"SCRIPT-JOBS: {len(jobs) - len(bad_jobs)}/{len(jobs)} OK")
+    print(f"SCRIPT-JOBS: {sum(1 for j in jobs if j['status'] == 'ok')}/{len(jobs)} OK")
     for j in bad_jobs:
         print(f"  [{j['status'].upper()}] {j['id']} — {j['detail']}")
+    for j in jobs:
+        if j["status"] in WARN_JOB:
+            print(f"  [FLAG] {j['id']} — {j['detail']} (amber — Lane 2, not escalation-worthy alone)")
     print(f"SERVERS: {sum(1 for s in servers if s['status'] == 'up')}/{len(servers)} up")
     for s in bad_servers:
         print(f"  [{s['status'].upper()}] {s['id']} — {s['detail']}")
