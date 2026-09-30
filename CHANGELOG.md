@@ -30,6 +30,11 @@ Gitignored data/output files are never committed.
   delivery ~6,000 times since 2026-09-06 while the worker looked healthy.
 - **`morning_page.py`**: understands `retired` and `degraded`; the wiki compile joins the timeline.
 
+### Security
+- **`samples/skill-footer-backups-2026-08-30/evening-digest.SKILL.md.pre-2026-08-30`**: the owner's
+  email address replaced with `<OWNER-EMAIL>` (flagged by the 2026-09-02 public-repo PII scope
+  review). Removed at HEAD only — earlier commits still contain it.
+
 ## [2026-09-13] — Missed first runs; taxes routine grouped
 
 ### Fixed
