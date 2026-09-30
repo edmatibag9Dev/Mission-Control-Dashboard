@@ -52,6 +52,7 @@ LATE_SLACK = timedelta(seconds=120)  # lastRunAt may precede the matched fire mi
 # completed. Grace is generous: the longest legitimate routine (the morning
 # briefing) runs well under an hour.
 STALL_GRACE = timedelta(hours=2)     # fired, but silent this long => stalled
+NEVER_RUN_LOOKBACK_DAYS = 62         # how far back a never-run task is checked for a missed first fire
 
 # Routine groups — Ed's locked spec 2026-07-28. Unlisted taskIds land in "Other".
 GROUPS = [
@@ -65,7 +66,8 @@ GROUPS = [
     ("Open Brain", ["substack-inbox-watcher", "action-item-triage", "open-brain-wiki-update", "weekly-brain-review"]),
     ("Token Dashboards", ["claude-token-dashboard-update", "token-dashboard-sentinel"]),
     ("Ops & System", ["ops-watcher", "evening-digest"]),
-    ("Personal", ["weekly-saltwater-fishing-report", "saltwater-multiday-refresh", "freshwater-trip-log"]),
+    ("Personal", ["weekly-saltwater-fishing-report", "saltwater-multiday-refresh", "freshwater-trip-log",
+                  "taxes-2026-monthly-receipt-capture"]),
 ]
 
 # launchd script jobs. Evidence rules per job (see check_script_jobs):
@@ -201,6 +203,18 @@ def read_heartbeats():
     return latest
 
 
+def task_created(task: dict):
+    """Birth time of the task's directory (macOS st_birthtime), or None. Editing SKILL.md
+    does not change the directory's birth time, so a prompt edit never resets it."""
+    p = task.get("path")
+    if not p:
+        return None
+    try:
+        return datetime.fromtimestamp(Path(p).parent.stat().st_birthtime).astimezone()
+    except (OSError, AttributeError):
+        return None
+
+
 def assess(task: dict, now: datetime, heartbeats=None) -> dict:
     out = {
         "taskId": task["taskId"],
@@ -240,6 +254,29 @@ def assess(task: dict, now: datetime, heartbeats=None) -> dict:
 
     expected = prev_fire(expr, now)
     out["expectedLast"] = expected.isoformat() if expected else None
+    if last is None:
+        # Never run. Before 2026-09-13 this fell through to "new" forever, so a
+        # routine whose FIRST fire never happened could not show as missed — and
+        # a monthly one read "ok" once its fire left the 9-day lookback. The task
+        # directory's birth time stands in for the scheduler's creation time
+        # (list_scheduled_tasks exposes none): only a fire AFTER creation counts.
+        created = task_created(task)
+        due = None
+        if created is not None:
+            days = min(NEVER_RUN_LOOKBACK_DAYS, (now - created).days + 1)
+            due = prev_fire(expr, now - jitter - RUN_GRACE, days)
+        if due is not None and due > created:
+            out["status"] = "missed"
+            out["detail"] = (f"never run — first fire {fmt(due, now)} passed with no run "
+                             f"(task created {fmt(created, now)})")
+        elif (expected is not None and (created is None or expected > created)
+              and now <= expected + jitter + RUN_GRACE):
+            out["status"] = "pending"
+            out["detail"] = f"first fire window open (due {expected.strftime('%-I:%M %p')}, jitter+grace not elapsed)"
+        else:
+            out["status"] = "new"
+            out["detail"] = "never run yet (newly created/migrated) — first fire pending"
+        return out
     if expected is None:
         out["status"], out["detail"] = "ok", "no fire due in lookback window"
     elif last is not None and last >= expected - LATE_SLACK:

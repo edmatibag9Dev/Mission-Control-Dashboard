@@ -21,7 +21,9 @@ layer" pilot.
 - **Deterministic routine health** — `watch.py` computes each routine's most recent expected fire
   from its cron expression (local time) and compares it to `lastRunAt` with jitter + grace; missed
   runs are caught without any notification parsing. Newly created tasks show "Not yet run", manual
-  tasks show "On-demand" — no false alarms.
+  tasks show "On-demand" — no false alarms. A task that has never run is checked back up to 62 days
+  from its creation (the task directory's birth time), so a first fire that never happened shows
+  MISSED instead of "Not yet run" forever.
 - **Heartbeat override** — every routine's prompt carries an attention-layer footer that appends
   `{task, ts, status, note}` to `runs/heartbeat.jsonl` at end of run; a `failed`/`partial` heartbeat
   overrides an OK computed from start-time alone, so a run that started and died still surfaces.

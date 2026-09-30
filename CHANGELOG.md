@@ -4,6 +4,23 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-09-13] — Missed first runs; taxes routine grouped
+
+### Fixed
+- **`watch.py`**: a recurring task that has never run can now be MISSED. Before, `lastRunAt: null`
+  always read "new" — so a routine whose first fire never happened stayed "Not yet run"
+  indefinitely, and a monthly one read "ok" once that fire left the 9-day lookback. A never-run task
+  is now checked back up to 62 days; a fire after the task's creation that has passed jitter + grace
+  with no run is MISSED. Creation time is the task directory's macOS birth time
+  (`list_scheduled_tasks` exposes none); a fire before creation never counts. With no birth time
+  the task stays "new"/"pending" as before.
+
+### Changed
+- **`watch.py`**: `taxes-2026-monthly-receipt-capture` (monthly, day 7, 9:00 AM) joins the
+  "Personal" group instead of landing in "Other". Its SKILL.md gained a heartbeat footer the same
+  day, so it can self-report failed/partial and becomes eligible for the STALLED verdict after its
+  first reported run.
+
 ## [2026-09-10] — Earnings put screener v2.0 coverage
 
 ### Changed
