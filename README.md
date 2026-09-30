@@ -47,6 +47,10 @@ layer" pilot.
   gauges (amber at 50%, red at 80%), and token burn by vendor (Claude vs OpenAI, yesterday and 7 days,
   stacked daily chart, 7-day API-equivalent cost). No model writes it, so it renders with the Claude
   app closed. It never writes to any source it reads.
+- **Run-record shadow (2026-09-30)** — for a routine that fired and went silent, the runner agent
+  fetches the scheduler's run record and `watch.py` proposes a verdict: a session that died on a
+  transient server or network error is flagged restart-eligible or blocked by guard. Shadow mode
+  reports only; the fleet-sentinel logs `shadow-would-restart` / `shadow-blocked` rows for Ed's review.
 - **Retired vs disabled** — a disabled task whose description opens `[RETIRED ...]` reads
   **Retired** and is not flagged. Any other disabled task keeps the daily "verify this is
   intentional" flag until someone records the decision in its description.
@@ -109,6 +113,8 @@ constants at the top of `watch.py`.
 - `runs/scheduled-tasks-snapshot.json` — the shared scheduled-task registry (`~/.claude/scheduled-tasks`),
   snapshotted by the watcher each run.
 - `runs/heartbeat.jsonl` — appended by each routine's attention-layer footer.
+- `runs/task-runs-snapshot.json` — scheduler run records (`list_task_runs`) for the tasks watch.py
+  names on `RUN-RECORD-CANDIDATES:`, written by the runner agent; ignored after 1 hour.
 - `~/Documents/Claude/Projects/AI-orchestration-layer/runs/digest.jsonl` — the Lane-2 queue (owned by
   ESCALATION-POLICY.md there; read-only view here).
 - launchd evidence: `~/Library/Logs/tokenburn/last-success`, `~/Open-Brain/.digest.log`,

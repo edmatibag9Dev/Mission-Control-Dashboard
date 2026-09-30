@@ -58,6 +58,29 @@ LATE_SLACK = timedelta(seconds=120)  # lastRunAt may precede the matched fire mi
 STALL_GRACE = timedelta(hours=2)     # fired, but silent this long => stalled
 NEVER_RUN_LOOKBACK_DAYS = 62         # how far back a never-run task is checked for a missed first fire
 
+# ---- Run-record reclassification — SHADOW WEEK (approved by Ed 2026-09-30; draft:
+# AI-orchestration-layer/reports/DRAFT-sentinel-stall-reclassification-2026-09-30.md).
+# watch.py cannot see the scheduler's run records, so a runner agent snapshots
+# list_task_runs for the tasks printed on RUN-RECORD-CANDIDATES into TASK_RUNS and runs
+# watch.py again. In SHADOW mode the proposal is REPORTED ONLY: the routine's status is
+# never changed, so the fleet-sentinel's existing restart rule cannot act on it. Flipping
+# SHADOW to False is Ed's decision after the shadow review — never an agent's.
+SHADOW = True
+TASK_RUNS = ROOT / "runs" / "task-runs-snapshot.json"
+TASK_RUNS_MAX_AGE = timedelta(hours=1)
+RUN_RECORD_AFTER = timedelta(minutes=20)   # fired, no heartbeat this long => fetch its run record
+RUN_MATCH_SLACK = timedelta(minutes=2)     # run started_at vs lastRunAt
+EARLY_DEATH = timedelta(minutes=2)         # guard 9: died this soon after start => no work landed
+NETWORK_FRESH = timedelta(minutes=15)      # guard 8: poller state younger than this => network up
+POLLER_STATE = ROOT / "runs" / "ops-poller-state.json"
+# Fail closed: only these errors count as transient. HTTP 429 is deliberately absent.
+TRANSIENT_RE = re.compile(r"API Error: 5\d\d|overloaded|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|"
+                          r"Can't reach the API server|socket hang up", re.I)
+AUTH_RE = re.compile(r"session_stale_relogin|\b401\b|OAuth|log ?in", re.I)
+# Guard 9 allowlist: routines verified safe to re-run after dying mid-work. Empty until Ed
+# signs off each entry (draft Open Question 2).
+RERUN_SAFE = set()
+
 # Routine groups — Ed's locked spec 2026-07-28 (Rockwell card added 2026-09-30).
 # Unlisted taskIds land in "Other". Group cards show enabled recurring tasks plus
 # disabled-but-not-retired ones; retired and one-time tasks live only in the
@@ -229,6 +252,78 @@ def read_heartbeats():
     return latest
 
 
+def read_task_runs(now: datetime):
+    """{taskId: [run, ...]} from the runner-written run-record snapshot, or {} if absent/stale."""
+    try:
+        data = json.loads(TASK_RUNS.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    written = parse_iso(data.get("written_at")) if isinstance(data, dict) else None
+    if written is None or now - written > TASK_RUNS_MAX_AGE:
+        return {}
+    runs = data.get("runs") or {}
+    return runs if isinstance(runs, dict) else {}
+
+
+def network_up(now: datetime) -> bool:
+    dt = mtime_dt(POLLER_STATE)
+    return dt is not None and now - dt <= NETWORK_FRESH
+
+
+def propose_from_run_record(task_id: str, last, now: datetime, task_runs):
+    """Draft 3.2/3.3: what the verdict WOULD be from the scheduler's run record. Pure; no side effects."""
+    runs = (task_runs or {}).get(task_id)
+    if not runs:
+        return None
+    run = None
+    for r in runs:
+        st = parse_iso(r.get("started_at"))
+        if st is not None and abs(st - last) <= RUN_MATCH_SLACK:
+            run = r
+            break
+    if run is None:
+        return {"verdict": "stalled", "class": "no-matching-record", "restart_eligible": False,
+                "blocked_by": ["7-record-confirmed"], "session_id": None, "error": None,
+                "summary": "no scheduler run record matches this fire — cause still unknown."}
+    status = run.get("status") or ""
+    error = (run.get("error") or "")[:160]
+    started, act = parse_iso(run.get("started_at")), parse_iso(run.get("last_activity_at"))
+    lived = (act - started) if started and act else None
+    lived_txt = (f"{lived.total_seconds():.0f}s" if lived is not None and lived < timedelta(minutes=2)
+                 else f"{lived.total_seconds() / 60:.0f}m" if lived is not None else "unknown time")
+    prop = {"session_id": run.get("session_id"), "run_status": status, "error": error or None,
+            "lived_seconds": round(lived.total_seconds()) if lived is not None else None}
+    if status == "failed" and error and AUTH_RE.search(error):
+        # Checked first: a credentials failure is never restarted around, whatever else it says.
+        prop.update(verdict="failed", **{"class": "credentials"}, restart_eligible=False,
+                    blocked_by=["4-credentials"])
+    elif status == "failed" and error and TRANSIENT_RE.search(error):
+        blocked = []
+        if not network_up(now):
+            blocked.append("8-network-down")
+        if not (task_id in RERUN_SAFE or (lived is not None and lived <= EARLY_DEATH)):
+            blocked.append("9-partial-work")
+        prop.update(verdict="failed", **{"class": "transient-api"}, restart_eligible=not blocked,
+                    blocked_by=blocked)
+    elif status == "failed":
+        prop.update(verdict="failed", **{"class": "unknown"}, restart_eligible=False,
+                    blocked_by=["7-not-transient"])
+    elif status == "running":
+        prop.update(verdict="stalled", **{"class": "parked"}, restart_eligible=False,
+                    blocked_by=["7-record-confirmed"])
+    else:  # succeeded or anything else: never proof of work (9/20 briefing: "succeeded" after 6 s)
+        prop.update(verdict="stalled", **{"class": "unreported"}, restart_eligible=False,
+                    blocked_by=["7-record-confirmed"])
+    what = (f"session {status or 'status unknown'} after {lived_txt}"
+            + (f" on \"{error[:90]}\"" if error else ""))
+    verdict = (f"would reclassify to FAILED/{prop['class']}" if prop["verdict"] == "failed"
+               else f"stays STALLED ({prop['class']})")
+    elig = ("restart-eligible" if prop["restart_eligible"]
+            else "not restart-eligible: " + ", ".join(prop["blocked_by"]))
+    prop["summary"] = f"{what} — {'shadow: ' if SHADOW else ''}{verdict}, {elig}."
+    return prop
+
+
 def task_created(task: dict):
     """Birth time of the task's directory (macOS st_birthtime), or None. Editing SKILL.md
     does not change the directory's birth time, so a prompt edit never resets it."""
@@ -241,7 +336,7 @@ def task_created(task: dict):
         return None
 
 
-def assess(task: dict, now: datetime, heartbeats=None) -> dict:
+def assess(task: dict, now: datetime, heartbeats=None, task_runs=None) -> dict:
     out = {
         "taskId": task["taskId"],
         "description": task.get("description", ""),
@@ -331,6 +426,13 @@ def assess(task: dict, now: datetime, heartbeats=None) -> dict:
                              f"{fmt(hb[0], now)}. Cause unknown from here — an unanswered "
                              f"approval prompt, or a session that died (API or network error). "
                              f"Check the task's latest run in the Scheduled panel.")
+        if not (hb and hb[0] >= expected - LATE_SLACK) and now > last + RUN_RECORD_AFTER:
+            out["run_record_candidate"] = True
+            prop = propose_from_run_record(task["taskId"], last, now, task_runs)
+            if prop:
+                out["shadow"] = prop
+                if out["status"] == "stalled" or prop["verdict"] == "failed":
+                    out["detail"] += " Run record: " + prop["summary"]
     elif now <= expected + jitter + RUN_GRACE:
         out["status"] = "pending"
         out["detail"] = f"fire window open (due {expected.strftime('%-I:%M %p')}, jitter+grace not elapsed)"
@@ -777,7 +879,8 @@ def main():
         return
     tasks = json.loads(SNAPSHOT.read_text())
     heartbeats = read_heartbeats()
-    assessed = [assess(t, now, heartbeats) for t in tasks]
+    task_runs = read_task_runs(now)
+    assessed = [assess(t, now, heartbeats, task_runs) for t in tasks]
     digest_items, digest_counts = read_digest(now)
     jobs = check_script_jobs(now, heartbeats)
     servers = check_servers(now)
@@ -801,7 +904,10 @@ def main():
                     "new": sum(1 for t in active if t["status"] == "new"),
                     "missed_failed": len(bad_routines), "flags": len(flags),
                     "job_issues": len(bad_jobs), "server_issues": len(bad_servers),
-                    "digest_open": len(digest_items)},
+                    "digest_open": len(digest_items),
+                    "shadow_mode": SHADOW,
+                    "shadow_proposals": sum(1 for t in assessed if t.get("shadow")),
+                    "run_record_candidates": sum(1 for t in assessed if t.get("run_record_candidate"))},
     }
     STATUS_OUT.write_text(json.dumps(payload, indent=2))
     HISTORY_DIR.mkdir(exist_ok=True)
@@ -816,6 +922,15 @@ def main():
         print(f"  [{t['status'].upper()}] {t['taskId']} — {t['detail']}")
     for t in flags:
         print(f"  [FLAG] {t['taskId']} — {t['detail']}")
+    need = [t["taskId"] for t in assessed if t.get("run_record_candidate") and t["taskId"] not in task_runs]
+    print(f"RUN-RECORD-CANDIDATES: {' '.join(need) if need else 'none'}"
+          + (f" — call list_task_runs(limit=3) for each, write {TASK_RUNS.relative_to(ROOT)}, rerun watch.py"
+             if need else ""))
+    for t in assessed:
+        sh = t.get("shadow")
+        if sh:
+            print(f"  [{'SHADOW' if SHADOW else 'RECLASS'}] {t['taskId']} — {sh['summary']}"
+                  f" (session {sh.get('session_id') or '—'})")
     print(f"SCRIPT-JOBS: {sum(1 for j in jobs if j['status'] == 'ok')}/{len(jobs)} OK")
     for j in bad_jobs:
         print(f"  [{j['status'].upper()}] {j['id']} — {j['detail']}")

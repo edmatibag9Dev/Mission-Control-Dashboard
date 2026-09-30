@@ -4,6 +4,22 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-09-30] — Run-record reclassification, shadow week
+
+### Added
+- **`watch.py`**: shadow-mode reclassification of stalled routines from the scheduler's run records
+  (Ed approved the shadow week 2026-09-30; spec: AI-orchestration-layer SPEC-self-healing-loop.md,
+  Phase 4b amendment). A routine that fired and wrote no heartbeat for 20 minutes is printed on
+  `RUN-RECORD-CANDIDATES:`; the runner agent snapshots `list_task_runs` into
+  `runs/task-runs-snapshot.json` and reruns watch.py. A matched record produces a proposal: `failed`
+  + transient error → FAILED/transient-api, credentials errors → never restartable, `running` →
+  parked, `succeeded` → unreported. Guards 8 (poller state < 15 min old = network up) and 9 (died
+  within 2 minutes, or on the empty `RERUN_SAFE` list) decide `restart_eligible`.
+- **`SHADOW = True`**: proposals are printed as `[SHADOW]` lines and stored in `tasks[].shadow`, and
+  appended to the STALLED detail — the routine's `status` never changes, so the fleet-sentinel's
+  restart rule cannot act on them. First live proposal: rockwell-daily-capture's 9/29 run, ENOTFOUND
+  after 12 minutes → transient-api, blocked by guard 9 (partial work).
+
 ## [2026-09-30] — Page accuracy fixes and three uncovered launchd jobs
 
 ### Fixed

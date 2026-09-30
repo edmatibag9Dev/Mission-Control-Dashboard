@@ -61,6 +61,15 @@ Three JSONL/JSON shapes every consumer depends on:
 watcher agent before each engine run (array of `{taskId, description, schedule, cronExpression?,
 fireAt?, enabled, nextRunAt?, lastRunAt?, jitterSeconds}`).
 
+**`runs/task-runs-snapshot.json`** (shadow week, 2026-09-30) — written by the runner agent only for the
+tasks on watch.py's `RUN-RECORD-CANDIDATES:` line, then watch.py runs once more:
+```json
+{"written_at": "2026-09-30T20:19:00-07:00", "runs": {"rockwell-daily-capture": [<list_task_runs runs, verbatim>]}}
+```
+Ignored when older than 1h. A matched `failed` record with a transient error yields a `tasks[].shadow`
+proposal (`class`, `restart_eligible`, `blocked_by`, `session_id`, `summary`). While `SHADOW = True` the
+routine's `status` is never changed — the proposal is report-only.
+
 **`runs/ops-status.json`** — the engine's output: `{generated_at, tasks[], script_jobs[], servers[],
 digest, summary}`. A dated copy lands in `runs/history/ops-status-<date>.json` per run (history-strip
 data).
@@ -80,8 +89,11 @@ Invariants an agent must preserve:
 6. Remote-server `unreachable` is amber and never escalates alone; reachable-but-stale content is red.
 9. `retired` (disabled + description opens `[RETIRED`) and job `degraded` are amber/grey states that
    never escalate alone. `degraded` means the job runs but some work items are not landing.
-10. The STALLED detail must not assert a single cause — `watch.py` cannot see the scheduler's run
-    records (2026-09-29: two "approval prompt" stalls were API deaths).
+10. The STALLED detail must not assert a single cause unless a matched scheduler run record proves it
+    (2026-09-29: two "approval prompt" stalls were API deaths). A `succeeded` record is never proof
+    of work — the 2026-09-20 briefing run was "succeeded" after 6 seconds.
+11. `SHADOW` in watch.py flips to False only on Ed's explicit approval after the shadow review. Until
+    then a shadow proposal must never change a routine's `status`.
 
 ## How it works (pipeline — native Mac runtime)
 
