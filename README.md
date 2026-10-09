@@ -4,7 +4,17 @@ One brand-styled page — and one autonomous morning watcher — covering the ru
 automated fleet: every Claude/Cowork scheduled routine, the personal launchd script jobs, and the
 local and remote servers.
 
-## Overview / Purpose
+## Project Overview
+
+Mission Control is a stdlib-only Python engine (`watch.py`) that computes run health for every
+scheduled routine, launchd script job and server, writes `runs/ops-status.json`, and renders
+`mission-control.html`. A read-only renderer (`morning_page.py`) turns the same data into the
+one-screen `morning-page.html`, and an out-of-band launchd monitor (`fleet_watchdog.py`) checks fleet
+liveness without relying on Claude. It was extracted from
+ the AI-orchestration-layer repo, where it began as the BUILD-PLAN Phase 4 "attention
+layer" pilot.
+
+## Purpose
 
 By mid-2026 the fleet had grown to ~15 scheduled AI routines, four launchd script jobs, and three
 always-on servers spread across two Macs and four storage locations. The only visibility was per-run
@@ -12,9 +22,7 @@ Slack notifications — which meant a *silently missed* run (the Mac asleep at f
 stalled on a permission prompt) was invisible, because the hardest thing to notice is an absent
 notification. This project replaces notification-watching with deterministic evidence: schedule math,
 self-reported heartbeats, job success stamps, and live server probes, all rendered on one dashboard
-and swept every morning by an agent that only interrupts when something is actually wrong. It was
-extracted from the AI-orchestration-layer repo, where it began as the BUILD-PLAN Phase 4 "attention
-layer" pilot.
+and swept every morning by an agent that only interrupts when something is actually wrong.
 
 ## Features
 
@@ -57,7 +65,11 @@ layer" pilot.
 - **Escalation-policy routing** — the daily `ops-watcher` task DMs Ed only for severity-gate issues,
   files noteworthy items to the evening digest, and stays silent on healthy days.
 
-## Files
+### STALLED verdict (added 2026-09-03, committed 2026-09-04)
+
+`watch.py` marks a routine **stalled** when `lastRunAt` shows it fired but no heartbeat arrived for that fire within 2 hours (`STALL_GRACE`). `lastRunAt` proves dispatch, never completion; only a heartbeat proves completion. Stalled is alert-only: the fleet-sentinel never auto-restarts it, because the run may have finished its real work and merely failed to report. The verdict does not know *why* the heartbeat is missing — an unanswered approval prompt and a session that died on an API or network error look identical from here (see Known Limitations). Guarded on prior heartbeat history, so a routine that has never written a footer is not flagged.
+
+## File Descriptions
 
 | File | Role |
 |---|---|
@@ -108,6 +120,16 @@ rows open the channel in the Slack app when `runs/morning-page.local.json` holds
 (copy `samples/sample.morning-page.local.json` and fill it in). Group membership, launchd jobs, and servers are configured in the
 constants at the top of `watch.py`.
 
+### Update / refresh
+
+Edit constants in `watch.py` (`GROUPS`, `SCRIPT_JOBS_STATIC`, `SERVERS`) to change coverage; run the
+AGENTS.md verification gates before committing. For the Morning Page, edit the constants at the top of
+`morning_page.py`: `NAMES` (timeline short names), `FOLD` (multi-fire routines collapsed to chosen
+hours), `TIMELINE_LAUNCHD`, `SOURCE_LINKS`, `ALERT_CHANNELS`; channel ids go in the gitignored
+`runs/morning-page.local.json`. Add a dated CHANGELOG entry and refresh this README
+on every `feat`/`fix`/`data` commit. Runtime data and the rendered dashboard are never committed —
+update `samples/` instead when a shape changes.
+
 ## Data Sources
 
 - `runs/scheduled-tasks-snapshot.json` — the shared scheduled-task registry (`~/.claude/scheduled-tasks`),
@@ -131,27 +153,41 @@ constants at the top of `watch.py`.
   Token data is a day behind in the morning render; the 8 PM render catches up.
 - Servers: localhost ports 8765/8787 and `http://eds-mac-studio.local:8080/latest.html`.
 
-## Known Limitations / Workarounds
+## Known Limitations
 
-- Scheduled tasks run only while the Claude app is open; a missed fire runs at next launch. The
-  staleness banner on the dashboard is the tell that the watcher itself did not run.
+- Scheduled tasks run only while the Claude app is open; a missed fire runs at next launch.
 - The Mac Studio probe requires both machines on the same LAN — away from home it reads amber
-  "Unreachable", by design not an escalation.
-- Session-scoped Cowork task state and cloud routines are not enumerable via any tool; the fleet was
-  consolidated into the shared registry on 2026-07-28 precisely to close that gap.
-- Heartbeat coverage starts from each routine's first post-footer run; absence is treated as neutral.
+  "Unreachable".
+- Session-scoped Cowork task state and cloud routines are not enumerable via any tool.
+- Heartbeat coverage starts from each routine's first post-footer run.
 - STALLED cannot name its cause. `watch.py` sees dispatch (`lastRunAt`) and completion (heartbeat)
   but not the scheduler's run record, so a run parked on an approval prompt and a session killed by
   an API or network error look the same. On 2026-09-29 both stalled routines were actually API
-  deaths. The detail text lists both causes and points at the task's run history.
+  deaths.
 - The dashboard refreshes only when a runner calls `watch.py` (8:04 AM, 9 AM, 8 PM), so between
   sweeps it can show a routine as stalled or missed after it has since run cleanly.
 - Morning Page: OpenAI cost shows `n/a` because `sessions.json` carries no Codex or ChatGPT cost rows
-  (its pricing table is Anthropic-only); adding that belongs to the Token Burn Dashboard repo.
+  (its pricing table is Anthropic-only).
 - Morning Page: Slack per-channel alert counts are Phase 2 — the ops bot is only in #ops-control, so
   channel rows show the link and "not read yet". Digest items are not linked (they live in a local log).
-- Morning Page: plan limits are parsed out of the Command Center HTML; if that block moves or is
-  renamed the tile says "unavailable" and the run report prints `gaps: plan-limits`.
+- Morning Page: plan limits are parsed out of the Command Center HTML, so a moved or renamed block
+  breaks the tile.
+
+## Workarounds
+
+- **Claude app closed at fire time:** the staleness banner on the dashboard is the tell that the
+  watcher itself did not run.
+- **Mac Studio off-LAN:** no workaround. By design the amber "Unreachable" is not an escalation.
+- **Non-enumerable task state:** the fleet was consolidated into the shared registry on 2026-07-28
+  precisely to close that gap.
+- **Heartbeat coverage gaps:** heartbeat absence is treated as neutral, never as failure.
+- **STALLED cause unknown:** the detail text lists both causes and points at the task's run history.
+- **Stale between sweeps:** refresh on demand with `python3 watch.py` (see How to Use).
+- **OpenAI cost `n/a`:** no workaround in this repo; adding that belongs to the Token Burn Dashboard
+  repo.
+- **Slack per-channel counts:** no workaround until Phase 2; channel rows still link to the channel.
+- **Plan-limits parse break:** no workaround. The tile says "unavailable" and the run report prints
+  `gaps: plan-limits`, so the break is visible.
 
 ## Build Notes
 
@@ -162,19 +198,5 @@ network probe carries a timeout and the script always exits 0 — interpretation
 agent, arithmetic to the script. Escalation semantics come from the AI-orchestration-layer's
 ESCALATION-POLICY.md four-lane contract.
 
-## Update / Refresh Instructions
-
-Edit constants in `watch.py` (`GROUPS`, `SCRIPT_JOBS_STATIC`, `SERVERS`) to change coverage; run the
-AGENTS.md verification gates before committing. For the Morning Page, edit the constants at the top of
-`morning_page.py`: `NAMES` (timeline short names), `FOLD` (multi-fire routines collapsed to chosen
-hours), `TIMELINE_LAUNCHD`, `SOURCE_LINKS`, `ALERT_CHANNELS`; channel ids go in the gitignored
-`runs/morning-page.local.json`. Add a dated CHANGELOG entry and refresh this README
-on every `feat`/`fix`/`data` commit. Runtime data and the rendered dashboard are never committed —
-update `samples/` instead when a shape changes.
-
 ---
-*Last updated: 2026-09-30*
-
-### STALLED verdict (added 2026-09-03, committed 2026-09-04)
-
-`watch.py` marks a routine **stalled** when `lastRunAt` shows it fired but no heartbeat arrived for that fire within 2 hours (`STALL_GRACE`). `lastRunAt` proves dispatch, never completion; only a heartbeat proves completion. Stalled is alert-only: the fleet-sentinel never auto-restarts it, because the run may have finished its real work and merely failed to report. The verdict does not know *why* the heartbeat is missing — an unanswered approval prompt and a session that died on an API or network error look identical from here (see Known Limitations). Guarded on prior heartbeat history, so a routine that has never written a footer is not flagged.
+*Last updated: 2026-10-09*

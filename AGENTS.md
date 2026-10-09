@@ -1,4 +1,5 @@
 # AGENTS.md — guide for AI agents working in this repo
+> Standard: REPO-STANDARD 2026-10-09 · Commits, README and staging: CONTRIBUTING.md
 
 This file is the canonical entry point for any AI agent (Claude Code, Cowork, Codex, etc.) asked to
 **use, reference, extend, or rebuild** this project. Read it before acting.
@@ -95,7 +96,9 @@ Invariants an agent must preserve:
 11. `SHADOW` in watch.py flips to False only on Ed's explicit approval after the shadow review. Until
     then a shadow proposal must never change a routine's `status`.
 
-## How it works (pipeline — native Mac runtime)
+## How it works
+
+Pipeline — native Mac runtime.
 
 1. The `ops-watcher` scheduled task (daily ~8:04 AM, `~/.claude/scheduled-tasks/ops-watcher/SKILL.md`)
    snapshots `list_scheduled_tasks` into `runs/`.
@@ -140,6 +143,8 @@ Invariants an agent must preserve:
 
 ## Verification gates
 
+Run before declaring a change done:
+
 1. `python3 watch.py` exits 0 and prints ROUTINES / SCRIPT-JOBS / SERVERS / DIGEST / ESCALATE lines.
 2. `runs/ops-status.json` parses and `summary` counts match the printed lines.
 3. `mission-control.html` opens with no missing sections (groups, script jobs, servers, digest, retired).
@@ -150,6 +155,8 @@ Invariants an agent must preserve:
 5. `git status --short` shows no `runs/` or `mission-control.html` entries staged.
 6. Scrub grep (`grep -rniE "@gmail|xoxb-|\bsk-[a-z0-9]{8,}|api[_-]key\s*[:=]" --exclude-dir=.git .`)
    matches nothing committed.
+7. Staged named paths only, and `git diff --cached --name-status --diff-filter=D` prints nothing — staging rules: [CONTRIBUTING.md → What to Stage](CONTRIBUTING.md#what-to-stage--never-commit-blindly).
+8. `python3 ~/.claude/skills/repo-standard/scripts/repo-check.py .` reports no FAIL lines.
 
 ## ⚠ `lastRunAt` IS NOT A LIVENESS SIGNAL
 
@@ -167,58 +174,3 @@ own output artifacts, and `~/Library/Logs/fleet-watchdog/last-ok`.
 
 `watch.py` still reads `lastRunAt` for scheduling arithmetic, which is fine — but it cross-checks
 heartbeats, and `fleet_watchdog.py` never reads it at all.
-
-
----
-
-## What to Stage — Never Commit Blindly
-
-Staging is part of the commit, not a detail beneath it. A commit records what you
-staged, so an unconditional stage records whatever state the working tree happens
-to be in — including damage you did not cause and did not notice.
-
-### Rules
-
-- **Stage named paths.** `git add <path> <path>` — only the files your change
-  actually touched. You should be able to say why each one is in the commit.
-- **Never `git add -A`, `git add .`, `git add --all`, or `git commit -a`** in a
-  repository that already has history. Use them only to bootstrap a fresh
-  `git init`, and verify the staged list before that first commit.
-- **Check for deletions before every commit:**
-
-  ```
-  git diff --cached --name-status --diff-filter=D
-  ```
-
-  If that prints anything you did not deliberately delete, STOP. Unstage with
-  `git reset`, find out why the file is missing, and restore it. Do not commit
-  the removal.
-- **A file missing from the working tree is not a change.** It is a filesystem,
-  sync-client, or tooling problem. Committing its deletion converts a recoverable
-  accident into recorded history and destroys the git copy that would have
-  restored it.
-- **Untracked is not protected.** A file that was never committed has no git copy
-  at all. If a working file matters, commit it or ignore it deliberately — never
-  leave it untracked by accident.
-
-### Staging self-check
-
-- [ ] Staged named paths only — no `-A`, no `.`, no `-a`
-- [ ] `git diff --cached --name-status --diff-filter=D` shows nothing unintended
-- [ ] Every staged path belongs to the change described in the commit message
-
-### Why this rule exists
-
-On 2026-08-30, commit `3df1d05` in the ai-briefing repo — a routine data commit —
-was staged unconditionally while two files were missing from the working tree. A
-two-way sync client had deleted them nine days earlier. The commit recorded both
-deletions, removing the last recoverable copies from git and leaving the sync
-client's quarantine folder as the only source. They were recovered, but only
-because that quarantine had not yet been purged on its retention timer.
-
-The same pattern nearly caused a data leak once before: an untracked `reports/`
-folder holding local absolute paths and an email address sat in a public repo,
-where any `git add .` would have swept it into a public commit.
-
-Unconditional staging fails in both directions. It commits what should never be
-published, and it deletes what should never be lost.

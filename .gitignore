@@ -13,7 +13,15 @@ runs/
 # Local-only config holding personal identifiers (if ever needed)
 CONFIG.local.md
 
-# Language / OS noise
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+
+# Backups, environments, language / OS noise
+*.bak*
+.venv/
+node_modules/
 __pycache__/
 *.pyc
 .DS_Store

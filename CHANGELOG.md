@@ -4,6 +4,21 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-10-09] — Conform to repo standard 2026-10-09
+
+### Changed
+- **`AGENTS.md`** — added the `Standard: REPO-STANDARD 2026-10-09` stamp on line 2; renamed
+  "How it works (pipeline — native Mac runtime)" to `## How it works` (the runtime note moved into
+  the section body); added a staging gate and a final `repo-check.py` gate; replaced the pasted
+  "What to Stage — Never Commit Blindly" block (a verbatim copy of `CONTRIBUTING.md`) with a link.
+- **`README.md`** — split "Overview / Purpose" into `## Project Overview` (new, derived from the
+  file map) and `## Purpose`; renamed "Files" to `## File Descriptions`; split "Known Limitations /
+  Workarounds" into `## Known Limitations` and `## Workarounds`; folded "Update / Refresh
+  Instructions" into How to Use as `### Update / refresh`; moved the "STALLED verdict" subsection,
+  which sat after the `Last updated` line, under Features; `Last updated` set to 2026-10-09.
+- **`.gitignore`** — added `.env`, `.env.*`, `!.env.example`, `.venv/`, `node_modules/` and
+  `*.bak*` (the last also hides the untracked `watch.py.bak-*` backup).
+
 ## [2026-09-30] — Run-record reclassification, shadow week
 
 ### Added
