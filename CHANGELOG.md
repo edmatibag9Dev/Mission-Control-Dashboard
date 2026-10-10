@@ -4,6 +4,11 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-10-10] — Maintenance review label
+
+### Changed
+- **`morning_page.py`** — the `skills-inventory-review` timeline label reads "Maintenance review". The routine is now titled Monthly Maintenance Review and also sweeps repos and Claude release notes; its task ID, and so the heartbeat key, is unchanged.
+
 ## [2026-10-09] — Conform to repo standard 2026-10-09
 
 ### Changed

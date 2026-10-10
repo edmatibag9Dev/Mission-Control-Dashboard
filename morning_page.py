@@ -72,7 +72,7 @@ NAMES = {
     "earnings-put-weekly-scan": "Earnings weekly scan (retired task)",
     "weekly-saltwater-fishing-report": "Fishing report",
     "open-brain-wiki-update": "Brain wiki",
-    "skills-inventory-review": "Skills review",
+    "skills-inventory-review": "Maintenance review",
     "saltwater-multiday-first-run-check": "Multi-day first-run check",
 }
 # Routines that fire many times a day: keep only these local hours on the timeline.
