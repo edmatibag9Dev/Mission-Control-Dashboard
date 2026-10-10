@@ -446,6 +446,17 @@ def assess(task: dict, now: datetime, heartbeats=None, task_runs=None) -> dict:
 
 # ---------------------------------------------------------------- digest queue
 
+def digest_headline(item, limit=90):
+    """One-line summary of a digest row: drop the 'source YYYY-MM-DD:' prefix, keep the first sentence."""
+    text = " ".join((item.get("text") or "").split())
+    m = re.match(r"^[\w .#-]{0,40}?\d{4}-\d{2}-\d{2}:\s*", text)
+    if m:
+        text = text[m.end():]
+    first = re.split(r"(?<=[.!?])\s+(?=[A-Z(])", text, maxsplit=1)[0]
+    if len(first) > limit:
+        first = first[:limit].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+    return first[:1].upper() + first[1:]
+
 def read_digest(now: datetime):
     items, counts = [], {"new": 0, "sent": 0, "expiring": 0, "stale": 0}
     if DIGEST.exists():
@@ -740,16 +751,26 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
     if attention or aging:
         lines = [f'<li><strong>{esc(x.get("taskId") or x.get("id"))}</strong> — {esc(x["detail"])}</li>'
                  for x in attention]
-        lines += [f'<li><strong>digest item aging</strong> — {esc(i["text"])[:140]} (day {i["age_days"]})</li>'
+        lines += [f'<li><strong>digest item, {i["age_days"]}d old</strong> — {esc(digest_headline(i))}</li>'
                   for i in aging]
         attention_html = '<section id="attention"><h2>Needs attention</h2><ul class="attn">' + "\n".join(lines) + "</ul></section>"
 
+    sev_rank = {"urgent": 0, "major": 1, "minor": 2, "info": 3}
+
+    def digest_card(i):
+        age = i["age_days"] or 0
+        age_cls = "stale" if age >= 14 else "aging" if age >= 12 else ""
+        sev = (i["severity"] or "info").lower()
+        meta = " · ".join(x for x in (i["category"].replace("-", " "), i["source"], (i["ts"] or "")[:10]) if x)
+        return (f'<li class="dg"><span class="sev sev-{esc(sev)}">{esc(sev)}</span>'
+                f'<div class="dgbody"><div class="dghead">{esc(digest_headline(i))}</div>'
+                f'<div class="dgmeta">{esc(meta)}</div>'
+                f'<details><summary>Details</summary><p>{esc(i["text"])}</p></details></div>'
+                f'<span class="dgage {age_cls}">{age}d</span></li>')
+
     digest_rows = "\n".join(
-        f'<tr><td class="mono">{esc((i["ts"] or "")[:10])}</td>'
-        f'<td class="mono">{i["age_days"]}d</td><td>{esc(i["severity"])}</td>'
-        f'<td>{esc(i["category"])}</td><td>{esc(i["text"])}</td></tr>'
-        for i in sorted(digest_items, key=lambda x: x["ts"] or "")
-    ) or '<tr><td colspan="5" class="empty">Queue is clear.</td></tr>'
+        digest_card(i) for i in sorted(digest_items, key=lambda x: (sev_rank.get((x["severity"] or "").lower(), 4), x["ts"] or ""))
+    ) or '<li class="empty">Queue is clear.</li>'
 
     stamp = now.strftime("%A %B %-d, %Y · %-I:%M %p %Z")
     gen_ms = int(now.timestamp() * 1000)
@@ -806,6 +827,20 @@ tr:last-child td {{ border-bottom:none; }}
   border-radius:8px; padding:14px 18px 14px 34px; }}
 .attn li {{ margin:4px 0; }}
 .empty {{ color:var(--muted); text-align:center; padding:18px; }}
+.dglist {{ list-style:none; padding:0; border:1px solid var(--border); border-radius:12px; background:var(--raised); }}
+.dg {{ display:flex; gap:12px; align-items:flex-start; padding:12px 16px; border-bottom:1px solid var(--border); }}
+.dg:last-child {{ border-bottom:none; }}
+.dgbody {{ flex:1; min-width:0; }}
+.dghead {{ font-weight:600; font-size:14px; }}
+.dgmeta {{ color:var(--muted); font-size:12px; margin-top:2px; }}
+.dg details {{ margin-top:4px; }} .dg summary {{ font-size:12px; }}
+.dg details p {{ font-size:13px; color:var(--muted); margin-top:6px; max-width:760px; }}
+.sev {{ font:600 10.5px "IBM Plex Mono",monospace; text-transform:uppercase; border-radius:4px; padding:2px 6px;
+  margin-top:2px; min-width:52px; text-align:center; background:var(--border); color:var(--muted); }}
+.sev-major,.sev-urgent {{ background:#D64545; color:#fff; }}
+.sev-minor {{ background:#B45309; color:#fff; }}
+.dgage {{ font:600 12.5px "IBM Plex Mono",monospace; color:var(--muted); white-space:nowrap; }}
+.dgage.aging {{ color:#B45309; }} .dgage.stale {{ color:#D64545; }}
 details {{ margin-top:10px; }} summary {{ cursor:pointer; color:var(--muted); font-size:14px; }}
 footer {{ margin-top:44px; color:var(--muted); font-size:12.5px; border-top:1px solid var(--border); padding-top:14px; }}
 </style></head><body>
@@ -840,9 +875,7 @@ ops-watcher may not have run. Check the Scheduled panel, or refresh the snapshot
 <div class="servers">{server_spans}</div></section>
 
 <section id="digest"><h2>Digest queue (Lane 2)</h2>
-<div class="tablewrap"><table>
-<thead><tr><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em;padding:8px 8px 8px 0">Filed</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Age</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Severity</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Category</th><th style="text-align:left;color:var(--muted);font:600 11px Inter;text-transform:uppercase;letter-spacing:.08em">Item</th></tr></thead>
-<tbody>{digest_rows}</tbody></table></div>
+<ul class="dglist">{digest_rows}</ul>
 <div class="sub">Delivered nightly by <strong>evening-digest</strong> · expiring at day 12 · stale at day 14 (per ESCALATION-POLICY.md)</div></section>
 
 <section><details><summary>One-time &amp; retired tasks ({len(retired)})</summary>
