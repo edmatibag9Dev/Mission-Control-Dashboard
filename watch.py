@@ -796,7 +796,9 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
                 f'<span class="dgage {age_cls}">{age}d</span></li>')
 
     digest_rows = "\n".join(
-        digest_card(i) for i in sorted(digest_items, key=lambda x: (sev_rank.get((x["severity"] or "").lower(), 4), x["ts"] or ""))
+        digest_card(i) for i in sorted(
+            sorted(digest_items, key=lambda x: sev_rank.get((x["severity"] or "").lower(), 4)),
+            key=lambda x: x["ts"] or "", reverse=True)
     ) or '<li class="empty">Queue is clear.</li>'
 
     stamp = now.strftime("%A %B %-d, %Y · %-I:%M %p %Z")
