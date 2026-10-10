@@ -34,6 +34,7 @@ noticing an absent Slack ping.**
 | `mission-control.html` | **no (gitignored)** | Generated dashboard — rebuilt by every run; never hand-edit. |
 | `morning-page.html` | **no (gitignored)** | Generated Morning Page — rebuilt after every `watch.py` run; never hand-edit. |
 | `runs/morning-page.local.json` | **no (gitignored)** | Slack workspace + channel ids for the Morning Page's channel links. Sample in `samples/`. |
+| `CONFIG.local.md` | **no (gitignored)** | Real values for placeholders in committed docs (e.g. `<SLACK_WORKSPACE>` in OPS-RUNBOOK.md). |
 | `runs/` | **no (gitignored)** | Runtime data: task snapshot, heartbeats, ops-status, dated history archives. |
 
 External dependencies (read, never owned here):

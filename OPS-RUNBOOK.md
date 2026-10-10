@@ -104,7 +104,7 @@ Never "fix" a watcher from inside the system — surface it. Poller log:
 
 ## 4. Setup / rebuild appendix (every pitfall from the 2026-08-31 build, so this takes 10 minutes)
 
-Slack side (app `ops_control` on workspace "Ed Matibag AI"):
+Slack side (app `ops_control` on workspace `<SLACK_WORKSPACE>` — real name in gitignored `CONFIG.local.md`):
 1. Channel **#ops-control** exists (currently private, id C0BTH036UKH).
 2. Incoming webhook bound to it → save URL to `~/.config/claude-alerts/ops-control_webhook`.
 3. Bot Token Scopes: `channels:read`, `channels:history`, `chat:write`, **plus

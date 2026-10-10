@@ -4,6 +4,16 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+
+## [2026-10-10] — Public repo attributes to the GitHub handle
+
+### Changed
+- **`watch.py`** — the dashboard's `<title>` reads "Mission Control — edmatibag9Dev" instead of the
+  owner's full name (repo standard §8: public repos attribute to the GitHub handle). Takes effect on
+  the next dashboard rebuild.
+- **`OPS-RUNBOOK.md`** — the Slack workspace name is now `<SLACK_WORKSPACE>`; the real name lives in
+  the gitignored `CONFIG.local.md`.
+- **`AGENTS.md`** — file map lists `CONFIG.local.md`.
 ## [2026-10-10] — Maintenance review label
 
 ### Changed
