@@ -446,16 +446,43 @@ def assess(task: dict, now: datetime, heartbeats=None, task_runs=None) -> dict:
 
 # ---------------------------------------------------------------- digest queue
 
-def digest_headline(item, limit=90):
-    """One-line summary of a digest row: drop the 'source YYYY-MM-DD:' prefix, keep the first sentence."""
+DIGEST_PREFIX = re.compile(r"^[\w .#-]{0,40}?\d{4}-\d{2}-\d{2}:\s*")
+SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
+BULLET_LABEL = re.compile(r"^([A-Z][A-Z0-9 /'-]{2,40}:)\s*")
+
+
+def digest_sentences(item):
+    """Digest text as sentences, minus the 'source YYYY-MM-DD:' prefix."""
     text = " ".join((item.get("text") or "").split())
-    m = re.match(r"^[\w .#-]{0,40}?\d{4}-\d{2}-\d{2}:\s*", text)
+    m = DIGEST_PREFIX.match(text)
     if m:
         text = text[m.end():]
-    first = re.split(r"(?<=[.!?])\s+(?=[A-Z(])", text, maxsplit=1)[0]
+    return [x for x in SENTENCE_BREAK.split(text) if x]
+
+
+def digest_headline(item, limit=90):
+    """One-line summary of a digest row: the first sentence, capped at `limit` characters."""
+    first = (digest_sentences(item) or [""])[0]
     if len(first) > limit:
         first = first[:limit].rsplit(" ", 1)[0].rstrip(",;:") + "…"
     return first[:1].upper() + first[1:]
+
+
+def digest_bullets_html(item, limit=90):
+    """Details as a bullet list, one sentence per bullet. The first sentence is skipped when the
+    headline already shows it whole; an all-caps lead-in like 'WHY IT MATTERS:' is bolded."""
+    sents = digest_sentences(item)
+    if sents and len(sents[0]) <= limit:
+        sents = sents[1:]
+    if not sents:
+        return '<p>No further detail.</p>'
+    lis = []
+    for x in sents:
+        x = x[:1].upper() + x[1:]
+        m = BULLET_LABEL.match(x)
+        lis.append(f"<li><strong>{esc(m.group(1))}</strong> {esc(x[m.end():])}</li>" if m
+                   else f"<li>{esc(x)}</li>")
+    return "<ul>" + "".join(lis) + "</ul>"
 
 def read_digest(now: datetime):
     items, counts = [], {"new": 0, "sent": 0, "expiring": 0, "stale": 0}
@@ -765,7 +792,7 @@ def render_html(assessed, digest_items, digest_counts, jobs, servers, now):
         return (f'<li class="dg"><span class="sev sev-{esc(sev)}">{esc(sev)}</span>'
                 f'<div class="dgbody"><div class="dghead">{esc(digest_headline(i))}</div>'
                 f'<div class="dgmeta">{esc(meta)}</div>'
-                f'<details><summary>Details</summary><p>{esc(i["text"])}</p></details></div>'
+                f'<details><summary>Details</summary>{digest_bullets_html(i)}</details></div>'
                 f'<span class="dgage {age_cls}">{age}d</span></li>')
 
     digest_rows = "\n".join(
@@ -834,7 +861,9 @@ tr:last-child td {{ border-bottom:none; }}
 .dghead {{ font-weight:600; font-size:14px; }}
 .dgmeta {{ color:var(--muted); font-size:12px; margin-top:2px; }}
 .dg details {{ margin-top:4px; }} .dg summary {{ font-size:12px; }}
-.dg details p {{ font-size:13px; color:var(--muted); margin-top:6px; max-width:760px; }}
+.dg details p,.dg details ul {{ font-size:13px; color:var(--muted); margin-top:6px; max-width:760px; }}
+.dg details ul {{ padding-left:18px; }} .dg details li {{ margin:4px 0; }}
+.dg details strong {{ color:var(--text); font-weight:600; }}
 .sev {{ font:600 10.5px "IBM Plex Mono",monospace; text-transform:uppercase; border-radius:4px; padding:2px 6px;
   margin-top:2px; min-width:52px; text-align:center; background:var(--border); color:var(--muted); }}
 .sev-major,.sev-urgent {{ background:#D64545; color:#fff; }}

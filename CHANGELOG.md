@@ -11,7 +11,8 @@ Gitignored data/output files are never committed.
 - **`watch.py`** — the Digest queue section is a compact list instead of a five-column table. Each
   item shows a severity pill, a one-line headline (first sentence, capped at 90 characters, with the
   "source YYYY-MM-DD:" prefix removed), one meta line (category · source · filed date), and its age.
-  The full text sits behind a collapsed "Details" toggle. Items sort by severity, then oldest first.
+  The full text sits behind a collapsed "Details" toggle as a bullet list, one sentence per bullet;
+  an all-caps lead-in such as "WHY IT MATTERS:" is bolded. Items sort by severity, then oldest first.
   Age turns amber at day 12 and red at day 14.
 - **`watch.py`** — "Needs attention" digest-aging lines use the same headline instead of a raw
   140-character cut.
