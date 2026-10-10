@@ -126,6 +126,10 @@ Pipeline — native Mac runtime.
 - **New server:** add to `SERVERS` (`kind: "port"` local, `kind: "http"` with `max_age_h` + `remote`).
 - **New status:** add to `BADGE` and, if it affects escalation, to `BAD_*` tuples.
 - **Layout:** all HTML/CSS lives in `render_html()`; brand tokens are inlined per Ed's brand guide.
+- **Digest queue view:** one list item per open row, newest first. `digest_headline()` (first sentence,
+  90-char cap, "source YYYY-MM-DD:" prefix stripped) is the title; `digest_bullets_html()` turns the
+  rest of the text into the "Details" bullet list. Rows render best when `text` opens with one short
+  sentence that states the finding.
 - **Morning Page:** timeline short names in `NAMES`, folded multi-fire routines in `FOLD`, launchd
   timeline cells in `TIMELINE_LAUNCHD`, footer links in `SOURCE_LINKS`, channel names in
   `ALERT_CHANNELS` (ids in the local config). Layout lives in `render()` of `morning_page.py`.
