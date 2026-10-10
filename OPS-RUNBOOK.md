@@ -105,7 +105,7 @@ Never "fix" a watcher from inside the system — surface it. Poller log:
 ## 4. Setup / rebuild appendix (every pitfall from the 2026-08-31 build, so this takes 10 minutes)
 
 Slack side (app `ops_control` on workspace `<SLACK_WORKSPACE>` — real name in gitignored `CONFIG.local.md`):
-1. Channel **#ops-control** exists (currently private, id C0BTH036UKH).
+1. Channel **#ops-control** exists (currently private, id `<SLACK_CHANNEL_ID>`).
 2. Incoming webhook bound to it → save URL to `~/.config/claude-alerts/ops-control_webhook`.
 3. Bot Token Scopes: `channels:read`, `channels:history`, `chat:write`, **plus
    `groups:read` + `groups:history` because the channel is private**. Pitfalls, all hit live:
@@ -120,7 +120,7 @@ Slack side (app `ops_control` on workspace `<SLACK_WORKSPACE>` — real name in 
    trailing newline**; macOS smart-quote substitution twice wrapped a pasted token in `‘…’`
    and broke auth (the poller now strips stray quotes, but don't rely on it):
    `printf 'xoxb-…' > ~/.config/claude-alerts/ops-bot_token && chmod 600 $_`
-5. Ed's Slack member ID → `~/.config/claude-alerts/ops-user_id` (currently `U0AQ3HDM8E5`).
+5. Ed's Slack member ID → `~/.config/claude-alerts/ops-user_id` (currently `<SLACK_USER_ID>`).
 
 Mac side:
 6. Poller: `cp com.edmatibag.slack-ops-poller.plist ~/Library/LaunchAgents/ && launchctl

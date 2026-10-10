@@ -14,6 +14,9 @@ Gitignored data/output files are never committed.
 - **`OPS-RUNBOOK.md`** — the Slack workspace name is now `<SLACK_WORKSPACE>`; the real name lives in
   the gitignored `CONFIG.local.md`.
 - **`AGENTS.md`** — file map lists `CONFIG.local.md`.
+- **`OPS-RUNBOOK.md`** — the #ops-control channel ID and the owner's Slack member ID are now
+  `<SLACK_CHANNEL_ID>` / `<SLACK_USER_ID>` (real values in `CONFIG.local.md`). Flagged by the new
+  repo-check Slack-ID check. The runtime reads its IDs from `~/.config/claude-alerts/`, not this doc.
 ## [2026-10-10] — Maintenance review label
 
 ### Changed
