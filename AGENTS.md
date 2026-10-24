@@ -47,6 +47,9 @@ External dependencies (read, never owned here):
   earnings screener `_launchd_scan.log`) and server ports/URLs configured at the top of `watch.py`.
   Since 2026-09-10 a script job may also name a `heartbeat` task: the earnings-put launchd jobs
   self-report to `runs/heartbeat.jsonl` on every exit path, and that row wins over file mtime.
+  Since 2026-10-24 those three are slot-aware (`cron` + `grace_h`): a passed slot with no heartbeat
+  reads `missed`, and a `partial` heartbeat (suspected Yahoo outage, nothing written) reads
+  `partial`. Both are in `BAD_JOB`, so they set ESCALATE-CANDIDATE like `failed`.
 
 ## The data contract
 
@@ -78,7 +81,10 @@ data).
 
 Invariants an agent must preserve:
 1. `heartbeat.jsonl` and `digest.jsonl` are **append-only** — never rewrite, reorder, or delete rows.
-2. Heartbeat **absence is neutral** — never treat a missing heartbeat as failure.
+2. Heartbeat **absence is neutral** — never treat a missing heartbeat as failure. One exception
+   (2026-10-24): a script job that carries `cron` + `grace_h` writes a heartbeat on every exit path,
+   so no heartbeat of any status since its last slot plus grace is `missed`. Alert-only — nothing
+   restarts launchd jobs.
 3. Routine statuses come only from `watch.py`'s computation — agents never hand-assign health.
 4. `mission-control.html` is generated — edits go in `render_html()`, never the artifact.
 7. `morning_page.py` is read-only over every source and writes only `morning-page.html`. It must never
@@ -120,7 +126,8 @@ Pipeline — native Mac runtime.
 
 - **New routine group / regroup:** edit `GROUPS` in `watch.py`.
 - **New launchd job:** add to `SCRIPT_JOBS_STATIC` (evidence file and/or `heartbeat` task name +
-  `max_age_h`); jobs with bespoke logic (like the tokenburn stamp pair) get a block in
+  `max_age_h`; a heartbeat job that reports on every exit path should also get its launchd `cron`
+  and a `grace_h` that covers its worst-case run, so a skipped fire reads `missed`); jobs with bespoke logic (like the tokenburn stamp pair) get a block in
   `check_script_jobs()`. Mirror it in `fleet_watchdog.py` `ROUTINES` (cron + evidence) and in
   `morning_page.py` `TIMELINE_LAUNCHD`.
 - **New server:** add to `SERVERS` (`kind: "port"` local, `kind: "http"` with `max_age_h` + `remote`).

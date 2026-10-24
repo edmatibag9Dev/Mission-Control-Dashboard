@@ -109,16 +109,27 @@ TOKENBURN_STAMP = Path.home() / "Library/Logs/tokenburn/last-success"
 #   earnings-put jobs (2026-09-10, screener v2.0) write a heartbeat.jsonl row on every
 #   exit path — including the season-off SKIP (exit 64) — so the heartbeat is the
 #   freshest and most specific evidence; the three share one log file, which is why
-#   mtime alone cannot tell them apart. A failed heartbeat status marks the job failed.
+#   mtime alone cannot tell them apart. A failed heartbeat status marks the job failed;
+#   a partial one (screener's suspected Yahoo outage: empty screen, nothing written)
+#   marks it partial, which escalates like failed (Ed, 2026-10-24).
+#   "cron" + "grace_h" make a heartbeat job slot-aware (2026-10-24, after the 10-23
+#   weekly-scan preflight failure): once the latest slot plus grace has passed with NO
+#   heartbeat of any status since that slot, the job is "missed" — Mac off or launchd
+#   unloaded. Age alone hid that for ~a day. Grace covers the screener's lock wait
+#   (25 min scan / 35 min report) plus its one 15-min outage retry. Alert-only: no
+#   component restarts launchd jobs.
 SCRIPT_JOBS_STATIC = [
     {"id": "openbrain.digest", "desc": "Open Brain digest script (run_digest.sh)",
      "schedule": "Daily 7:00 AM", "evidence": Path.home() / "Open-Brain/.digest.log", "max_age_h": 26},
     {"id": "earnings-put-weekly-scan", "desc": "Earnings put screener — Friday weekly scan (launchd)",
-     "schedule": "Friday 12:00 PM", "heartbeat": "earnings-put-weekly-scan", "max_age_h": 8 * 24},
+     "schedule": "Friday 12:00 PM", "heartbeat": "earnings-put-weekly-scan", "max_age_h": 8 * 24,
+     "cron": "0 12 * * 5", "grace_h": 2},
     {"id": "earnings-put-daily-scan", "desc": "Earnings put screener — daily update (launchd)",
-     "schedule": "Weekdays 6:45 AM", "heartbeat": "earnings-put-daily-scan", "max_age_h": 4 * 24},
+     "schedule": "Weekdays 6:45 AM", "heartbeat": "earnings-put-daily-scan", "max_age_h": 4 * 24,
+     "cron": "45 6 * * 1-5", "grace_h": 1.5},
     {"id": "earnings-put-weekly-report", "desc": "Earnings put screener — weekly + season report (launchd)",
-     "schedule": "Friday 2:00 PM", "heartbeat": "earnings-put-weekly-report", "max_age_h": 8 * 24},
+     "schedule": "Friday 2:00 PM", "heartbeat": "earnings-put-weekly-report", "max_age_h": 8 * 24,
+     "cron": "0 14 * * 5", "grace_h": 1},
     # 2026-09-30: three launchd jobs that had no coverage. `ok_line` is a regex the
     # evidence file's last non-empty line must match — mtime alone cannot tell a
     # failed run from a good one when the job logs both.
@@ -551,13 +562,21 @@ def check_script_jobs(now: datetime, heartbeats=None):
             last_line = last_nonempty_line(j["evidence"])
             if last_line is not None and not re.search(j["ok_line"], last_line):
                 bad_line = last_line[-120:]
+        # Latest slot whose grace has run out; a heartbeat of any status since it clears it.
+        slot = prev_fire(j["cron"], now - timedelta(hours=j["grace_h"])) if j.get("cron") else None
         if dt is None:
             st, detail = "failed", (f"evidence file missing: {j['evidence']}" if j.get("evidence")
                                     else "no heartbeat yet")
         elif bad_line is not None:
             st, detail = "failed", f"last run {fmt(dt, now)} did not report success: {bad_line}"
+        elif slot and (hb is None or hb[0] < slot - LATE_SLACK):
+            st, detail = "missed", (f"no heartbeat for the {fmt(slot, now)} slot (grace {j['grace_h']}h) — "
+                                    f"Mac off or launchd job unloaded; alert-only, never restart"
+                                    + (f" (last heartbeat {fmt(hb[0], now)}, {hb[1]})" if hb else ""))
         elif hb and hb[1] == "failed" and dt == hb[0]:
             st, detail = "failed", f"last run reported failed {fmt(dt, now)}{hb_note}"
+        elif hb and hb[1] == "partial" and dt == hb[0]:
+            st, detail = "partial", f"last run reported partial {fmt(dt, now)} — nothing written{hb_note}"
         elif (now - dt).total_seconds() / 3600 <= j["max_age_h"]:
             st, detail = "ok", f"last activity {fmt(dt, now)}{hb_note}"
         else:
@@ -677,7 +696,7 @@ BADGE = {
 
 BAD_ROUTINE = ("missed", "failed", "stalled")
 WARN_ROUTINE = ("partial", "off", "note")
-BAD_JOB = ("failed", "stale")
+BAD_JOB = ("failed", "stale", "missed", "partial")   # job partial = no output that run (Ed, 2026-10-24)
 WARN_JOB = ("degraded",)
 BAD_SERVER = ("down", "stale")
 

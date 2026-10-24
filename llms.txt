@@ -18,7 +18,7 @@
 - [SCHEDULE.md](SCHEDULE.md): the daily ops-watcher sweep — task location, cadence, prerequisites.
 
 ## Key rules
-- heartbeat.jsonl and the cross-repo digest.jsonl are append-only; heartbeat absence is neutral.
+- heartbeat.jsonl and the cross-repo digest.jsonl are append-only; heartbeat absence is neutral, except a slot-aware launchd job (cron + grace_h) with no heartbeat since its last slot reads missed.
 - Health comes from watch.py's computation only; agents never hand-assign statuses.
 - tokenburn health keys off the last-success stamp — watchdog log silence is healthy, not stale.
 - Remote-server unreachable = amber, never an escalation alone; reachable-but-stale = red.

@@ -41,7 +41,10 @@ and swept every morning by an agent that only interrupts when something is actua
   success pattern (`ok_line` — the Open Brain wiki compile uses `compile OK`). Since 2026-09-30 the
   wiki compile, the #ops-control poller, and the Codex session-capture worker are covered; the last
   reads **Degraded** (amber) when any capture has failed delivery for over a day while the worker
-  itself keeps running.
+  itself keeps running. Since 2026-10-24 the three earnings-put jobs are slot-aware: once a launchd
+  slot plus its grace (1.5 h daily, 2 h weekly scan, 1 h report) passes with no heartbeat, the job
+  reads **Missed** (Mac off or job unloaded). A `partial` heartbeat (suspected Yahoo outage, nothing
+  written) reads **Partial**. Both escalate like Failed, and both are alert-only.
 - **Server probes** — local port checks plus a remote HTTP HEAD of the Mac Studio screener with
   `Last-Modified` freshness; an asleep remote host shows amber, never a false red.
 - **Grouped dashboard** — 9 purpose-group cards with health rollups (retired and one-time tasks
@@ -160,6 +163,8 @@ update `samples/` instead when a shape changes.
   "Unreachable".
 - Session-scoped Cowork task state and cloud routines are not enumerable via any tool.
 - Heartbeat coverage starts from each routine's first post-footer run.
+- A manual earnings-put run writes no heartbeat by design, so a failed or missed scheduled run keeps
+  its red verdict until the next scheduled run reports, even after a manual rerun repaired the output.
 - STALLED cannot name its cause. `watch.py` sees dispatch (`lastRunAt`) and completion (heartbeat)
   but not the scheduler's run record, so a run parked on an approval prompt and a session killed by
   an API or network error look the same. On 2026-09-29 both stalled routines were actually API

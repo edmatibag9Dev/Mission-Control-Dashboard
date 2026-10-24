@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); dates are Americ
 Gitignored data/output files are never committed.
 
 
+## [2026-10-24] — Missed and partial earnings-put launchd runs
+
+### Added
+- **`watch.py`** — the three earnings-put launchd jobs carry their launchd `cron` and a `grace_h`
+  (daily scan 1.5 h, weekly scan 2 h, weekly report 1 h). When the latest slot plus grace has passed
+  and no heartbeat of any status exists since that slot, the job reads `missed` (Mac off or launchd
+  job unloaded). Before, age alone kept the previous Friday's ok heartbeat green until about Saturday
+  noon, so the Friday 20:00 sweep saw nothing. Found after the 2026-10-23 weekly-scan preflight failure.
+- **`watch.py`** — a `partial` heartbeat (the screener's suspected Yahoo outage: empty screen,
+  nothing written) now reads `partial` instead of OK.
+
+### Changed
+- **`watch.py`** — `BAD_JOB` adds `missed` and `partial`, so both set ESCALATE-CANDIDATE like
+  `failed` (Ed, 2026-10-24). They stay alert-only: no component restarts launchd jobs.
+- **`AGENTS.md`**, **`README.md`**, **`llms.txt`** — document the slot rule and the one exception to
+  "heartbeat absence is neutral".
+
+
 ## [2026-10-10] — Compact digest queue
 
 ### Changed
