@@ -162,7 +162,7 @@ update `samples/` instead when a shape changes.
   `~/Documents/Claude/claude-token-dashboard.html` (plan limits scraped by the 6:10 PM task), and
   `AI-orchestration-layer/runs/repair.jsonl` + `ops-commands.jsonl` (restarts, queued Slack commands).
   Token data is a day behind in the morning render; the 8 PM render catches up.
-- Servers: localhost ports 8765/8787/8800, `http://eds-mac-studio.tail284bf0.ts.net:8080/index.html` and the
+- Servers: localhost port 8800 (hub root), `https://eds-mac-studio.tail284bf0.ts.net:8444/index.html` (screener) and the
   dashboard-hub catalog `https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json` (stale past 1 h).
 
 ## Known Limitations

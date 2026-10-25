@@ -158,11 +158,11 @@ CODEX_CAPTURE = Path.home() / ".codex/session-capture"
 CODEX_STUCK_ATTEMPTS = 288          # one day of 5-minute retries
 
 SERVERS = [
-    {"id": "ai-briefing", "kind": "port", "port": 8765, "desc": "Morning AI Briefing site"},
-    {"id": "openbrain-review-dashboard", "kind": "port", "port": 8787, "desc": "Open Brain review dashboard"},
-    # Tailnet name (2026-10-25) instead of .local so the probe also works off the home LAN.
+    # 2026-10-25: the :8765 (AI Briefing) and :8787 (Open Brain review) servers were retired;
+    # both pages are now served from the dashboard hub root (:8800 here, :8443 on the Studio).
+    # The screener sits behind tailscale serve :8444 (TLS) in front of studio_server.rb :8080.
     {"id": "earnings-put-scanner @ eds-mac-studio", "kind": "http",
-     "url": "http://eds-mac-studio.tail284bf0.ts.net:8080/index.html", "max_age_h": 8 * 24, "remote": True,
+     "url": "https://eds-mac-studio.tail284bf0.ts.net:8444/index.html", "max_age_h": 8 * 24, "remote": True,
      "desc": "Earnings Put Screener served from the Mac Studio"},
     # dashboard-hub (2026-10-25): local root server, and the Studio hub's catalog.json whose
     # Last-Modified is the hub index job's success stamp (rebuilds every 15 min → 1 h = dead).

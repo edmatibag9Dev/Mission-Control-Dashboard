@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); dates are Americ
 Gitignored data/output files are never committed.
 
 
+## [2026-10-25] — Old dashboard servers retired
+
+### Removed
+- **`watch.py`** — the `:8765` (AI Briefing) and `:8787` (Open Brain review) port probes; both servers are
+  retired and the pages are served from the dashboard hub root, which is probed via `:8800` and the Studio
+  `catalog.json`.
+
+### Changed
+- **`watch.py`** — the Studio screener probe is `https://eds-mac-studio.tail284bf0.ts.net:8444/index.html`
+  (tailscale serve in front of the Ruby server).
+- **`morning_page.py`** — AI Briefing and Open Brain review footer links point at the hub.
+
 ## [2026-10-25] — Mission Control watches the dashboard hub
 
 ### Added

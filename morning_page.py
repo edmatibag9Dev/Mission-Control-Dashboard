@@ -98,9 +98,9 @@ SOURCE_LINKS = [
     ("Claude Token Command Center", COMMAND_CENTER_LINK),
     ("Token Burn Dashboard", TOKEN_BURN_LINK),
     ("Dashboard Hub", "https://eds-mac-studio.tail284bf0.ts.net:8443/"),
-    ("AI Briefing", "http://localhost:8765/"),
+    ("AI Briefing", "https://eds-mac-studio.tail284bf0.ts.net:8443/ai-briefing/index.html"),
     ("Earnings Put Screener", "http://eds-mac-studio.local:8080/index.html"),
-    ("Open Brain review", "http://localhost:8787/"),
+    ("Open Brain review", "https://eds-mac-studio.tail284bf0.ts.net:8443/open-brain-review/review-dashboard.local.html"),
 ]
 # Channel names only; ids + workspace come from runs/morning-page.local.json (never committed).
 ALERT_CHANNELS = ["ops-control", "token-dashboard-alerts", "ai-briefing",
