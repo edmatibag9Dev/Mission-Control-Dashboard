@@ -115,13 +115,19 @@ carries that day's token-burn numbers). To refresh on demand:
 cd ~/Documents/Claude/Projects/Mission-Control-Dashboard && python3 morning_page.py
 ```
 
-Open it from disk (double-click or `open morning-page.html`), not through a web server: browsers
-only allow the file-to-file links (Mission Control, Command Center, Token Burn) from a page that was
-itself opened as a file. The three server links (AI Briefing, Earnings Put Screener, Open Brain
-review) work either way. Needs-a-look items jump to `mission-control.html#<task-id>`; Slack channel
-rows open the channel in the Slack app when `runs/morning-page.local.json` holds the channel ids
-(copy `samples/sample.morning-page.local.json` and fill it in). Group membership, launchd jobs, and servers are configured in the
-constants at the top of `watch.py`.
+Open it through the dashboard hub, not from this folder: the hub stages every dashboard under its
+own slug directory (`<root>/morning-page/`, `<root>/mission-control/`, `<root>/command-center/`,
+`<root>/token-burn/`), and since 2026-10-25 the page's links to Mission Control, the Command Center
+and Token Burn are relative hub paths (`../mission-control/mission-control.html` and so on). They
+resolve on `https://eds-mac-studio.tail284bf0.ts.net:8443/morning-page/morning-page.html` (hub), on
+the MacBook origin `https://ed-macbook-pro-m1x.tail284bf0.ts.net/morning-page/morning-page.html`,
+and from the staged root on disk (`/Users/Shared/dashboards/morning-page/morning-page.html`). Opened
+straight from this repo folder, those three links have no sibling directory to point at and 404; the
+server links (AI Briefing, Earnings Put Screener, Open Brain review) work either way. Needs-a-look
+items jump to `../mission-control/mission-control.html#<task-id>`; Slack channel rows open the
+channel in the Slack app when `runs/morning-page.local.json` holds the channel ids (copy
+`samples/sample.morning-page.local.json` and fill it in). Group membership, launchd jobs, and servers
+are configured in the constants at the top of `watch.py`.
 
 ### Update / refresh
 
@@ -176,7 +182,10 @@ update `samples/` instead when a shape changes.
 - Morning Page: Slack per-channel alert counts are Phase 2 — the ops bot is only in #ops-control, so
   channel rows show the link and "not read yet". Digest items are not linked (they live in a local log).
 - Morning Page: plan limits are parsed out of the Command Center HTML, so a moved or renamed block
-  breaks the tile.
+  breaks the tile. A limit the Command Center could not read arrives as the string `n/a`; the gauge
+  shows `n/a` with an empty bar (since 2026-10-25; before, the render crashed on it).
+- Morning Page: the dashboard links assume the hub's sibling-slug layout, so the page opened from
+  this repo folder has dead Mission Control / Command Center / Token Burn links.
 
 ## Workarounds
 

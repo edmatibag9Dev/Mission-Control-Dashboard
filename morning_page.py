@@ -42,9 +42,16 @@ DAILY_BURN = TOKENBURN / "daily-burn.json"
 SESSIONS = TOKENBURN / "sessions.json"
 CHATGPT_META = TOKENBURN / "chatgpt-export-meta.json"
 COMMAND_CENTER = Path.home() / "Documents/Claude/claude-token-dashboard.html"
-TOKEN_BURN_HTML = Path.home() / "Documents/Claude/token-burn-dashboard.html"
-MC_HTML = ROOT / "mission-control.html"
 OUT = ROOT / "morning-page.html"
+
+# Dashboard links are relative hub paths, not file:// URLs. The dashboard-hub stages every page
+# under its own slug directory as siblings of this one (<root>/morning-page/, <root>/mission-control/,
+# <root>/command-center/, <root>/token-burn/), so these resolve wherever that root is served:
+# https://eds-mac-studio.tail284bf0.ts.net:8443/ (hub), the MacBook origin, or the staged root on disk.
+# A file:// href does nothing when the page is opened over HTTPS from a phone or by an agent.
+MC_LINK = "../mission-control/mission-control.html"
+COMMAND_CENTER_LINK = "../command-center/claude-token-dashboard.html"
+TOKEN_BURN_LINK = "../token-burn/token-burn-dashboard.html"
 
 STALE_AFTER = timedelta(hours=26)
 DUE_GRACE = timedelta(minutes=45)     # matches watch.RUN_GRACE
@@ -87,9 +94,9 @@ TIMELINE_LAUNCHD = [
     ("Earnings weekly report", "earnings-put-weekly-report", "0 14 * * 5"),
 ]
 SOURCE_LINKS = [
-    ("Mission Control", MC_HTML.as_uri()),
-    ("Claude Token Command Center", COMMAND_CENTER.as_uri()),
-    ("Token Burn Dashboard", TOKEN_BURN_HTML.as_uri()),
+    ("Mission Control", MC_LINK),
+    ("Claude Token Command Center", COMMAND_CENTER_LINK),
+    ("Token Burn Dashboard", TOKEN_BURN_LINK),
     ("AI Briefing", "http://localhost:8765/"),
     ("Earnings Put Screener", "http://eds-mac-studio.local:8080/index.html"),
     ("Open Brain review", "http://localhost:8787/"),
@@ -174,7 +181,20 @@ def boost_note(us):
     return m.group(1) if m else ""
 
 
+def pct_num(v):
+    """Numeric percent for a gauge bar; the Command Center writes 'n/a' when a bar was not rendered."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def pct_label(v):
+    return f"{v}%" if isinstance(v, (int, float)) else str(v or "n/a")
+
+
 def gauge_class(pct):
+    pct = pct_num(pct)
     return "bad" if pct >= 80 else ("warn" if pct >= 50 else "")
 
 
@@ -415,7 +435,7 @@ def render(ctx):
     timeline_html = "\n      ".join(cells) or '<div class="slot up"><span class="n">Nothing scheduled today</span></div>'
 
     # ---- needs a look
-    mc = MC_HTML.as_uri()
+    mc = MC_LINK
     look = []
     for t in broken:
         body = first_sentence(t["detail"], 150)
@@ -496,10 +516,10 @@ def render(ctx):
     # ---- plan tile
     if us:
         rows = [
-            ("Current session", us.get("currentSessionPct", 0), f"{us.get('currentSessionPct', 0)}%", us.get("currentSessionReset", "")),
-            ("Weekly, all models", us.get("weeklyAllPct", 0), f"{us.get('weeklyAllPct', 0)}%", us.get("weeklyAllReset", "")),
-            ("Weekly, Fable", us.get("weeklySonnetPct", 0), f"{us.get('weeklySonnetPct', 0)}%", us.get("weeklySonnetReset", "")),
-            ("Extra usage", us.get("extraUsagePct", 0), f"${us.get('extraUsageSpent', 0):.0f}", f"of ${us.get('extraUsageLimit', 0):.0f} · {us.get('extraUsageReset', '')}"),
+            ("Current session", pct_num(us.get("currentSessionPct", 0)), pct_label(us.get("currentSessionPct", 0)), us.get("currentSessionReset", "")),
+            ("Weekly, all models", pct_num(us.get("weeklyAllPct", 0)), pct_label(us.get("weeklyAllPct", 0)), us.get("weeklyAllReset", "")),
+            ("Weekly, Fable", pct_num(us.get("weeklySonnetPct", 0)), pct_label(us.get("weeklySonnetPct", 0)), us.get("weeklySonnetReset", "")),
+            ("Extra usage", pct_num(us.get("extraUsagePct", 0)), f"${pct_num(us.get('extraUsageSpent', 0)):.0f}", f"of ${pct_num(us.get('extraUsageLimit', 0)):.0f} · {us.get('extraUsageReset', '')}"),
         ]
         gauge_html = "\n".join(
             f'<span class="k">{esc(k)}</span><span class="bar"><i class="{gauge_class(p)}" style="width:{max(0, min(100, p))}%"></i></span>'

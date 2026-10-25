@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); dates are Americ
 Gitignored data/output files are never committed.
 
 
+## [2026-10-25] — Morning Page links work over the dashboard hub
+
+### Changed
+- **`morning_page.py`** — the Mission Control, Claude Token Command Center and Token Burn links
+  (footer, and every Needs-a-look `#anchor` link) are relative hub paths
+  (`../mission-control/mission-control.html`, `../command-center/claude-token-dashboard.html`,
+  `../token-burn/token-burn-dashboard.html`) instead of absolute `file:///Users/edmatibag/...` URLs.
+  The dashboard-hub (2026-10-25) serves every page under its own slug directory as siblings, so the
+  links resolve on the hub (`https://eds-mac-studio.tail284bf0.ts.net:8443/`), on the MacBook
+  origin, and from the staged root on disk. A `file://` href did nothing from a phone or an agent
+  reading the page over HTTPS. `watch.py` already had no `file://` links.
+
+### Fixed
+- **`morning_page.py`** — the plan-limits tile no longer crashes the render when the Command
+  Center reports a limit as the string `n/a` (its 2026-10-24 export did, for the Fable weekly bar;
+  `morning-page.html` had not been rebuilt since 2026-10-20). Gauges coerce the value to 0 and
+  print `n/a`.
+
+### Documentation
+- **`README.md`** — how to open the page (through the hub, not from this folder), the new link
+  behaviour, and the two limitations above.
+
 ## [2026-10-24] — Missed and partial earnings-put launchd runs
 
 ### Added
