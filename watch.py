@@ -141,6 +141,13 @@ SCRIPT_JOBS_STATIC = [
     # 2026-09-29 18:50-19:04 and 22:00-02:00), not a dead job — hence 6h, not 3 min.
     {"id": "slack-ops-poller", "desc": "#ops-control command poller (slack_ops_poller.py)",
      "schedule": "Every 3 min", "evidence": ROOT / "runs/ops-poller-state.json", "max_age_h": 6},
+    # 2026-10-25: dashboard-hub sync (launchd, every 10 min) stages this Mac's dashboards
+    # into /Users/Shared/dashboards and pushes them to the Studio hub. Its summary line is
+    # the last line of sync.log; `pushed=True` means the hub took the copy. The Studio
+    # never sleeps, so pushed=False is a real failure, not a sleeping peer.
+    {"id": "dashboards-sync", "desc": "Dashboard hub sync → Mac Studio (dashboard-hub/hub/sync.py)",
+     "schedule": "Every 10 min", "evidence": Path.home() / "Library/Logs/dashboard-hub/sync.log",
+     "ok_line": r"pushed=True", "max_age_h": 1},
 ]
 
 # Codex session capture (launchd, every 5 min): the worker log's mtime proves it runs,
@@ -153,9 +160,16 @@ CODEX_STUCK_ATTEMPTS = 288          # one day of 5-minute retries
 SERVERS = [
     {"id": "ai-briefing", "kind": "port", "port": 8765, "desc": "Morning AI Briefing site"},
     {"id": "openbrain-review-dashboard", "kind": "port", "port": 8787, "desc": "Open Brain review dashboard"},
+    # Tailnet name (2026-10-25) instead of .local so the probe also works off the home LAN.
     {"id": "earnings-put-scanner @ eds-mac-studio", "kind": "http",
-     "url": "http://eds-mac-studio.local:8080/index.html", "max_age_h": 8 * 24, "remote": True,
+     "url": "http://eds-mac-studio.tail284bf0.ts.net:8080/index.html", "max_age_h": 8 * 24, "remote": True,
      "desc": "Earnings Put Screener served from the Mac Studio"},
+    # dashboard-hub (2026-10-25): local root server, and the Studio hub's catalog.json whose
+    # Last-Modified is the hub index job's success stamp (rebuilds every 15 min → 1 h = dead).
+    {"id": "dashboards-server", "kind": "port", "port": 8800, "desc": "Dashboard hub root on this Mac"},
+    {"id": "dashboard-hub @ eds-mac-studio", "kind": "http",
+     "url": "https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json", "max_age_h": 1, "remote": True,
+     "desc": "Dashboard hub catalog on the Mac Studio (index rebuilds every 15 min)"},
 ]
 
 # ---------------------------------------------------------------- cron matching

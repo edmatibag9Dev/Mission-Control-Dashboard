@@ -97,6 +97,7 @@ SOURCE_LINKS = [
     ("Mission Control", MC_LINK),
     ("Claude Token Command Center", COMMAND_CENTER_LINK),
     ("Token Burn Dashboard", TOKEN_BURN_LINK),
+    ("Dashboard Hub", "https://eds-mac-studio.tail284bf0.ts.net:8443/"),
     ("AI Briefing", "http://localhost:8765/"),
     ("Earnings Put Screener", "http://eds-mac-studio.local:8080/index.html"),
     ("Open Brain review", "http://localhost:8787/"),

@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); dates are Americ
 Gitignored data/output files are never committed.
 
 
+## [2026-10-25] — Mission Control watches the dashboard hub
+
+### Added
+- **`watch.py`** — `dashboards-sync` launchd job in `SCRIPT_JOBS_STATIC` (evidence
+  `~/Library/Logs/dashboard-hub/sync.log`, `ok_line` `pushed=True`, 1 h), plus two server probes:
+  local port 8800 (hub root on this Mac) and `https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json`
+  (remote, `max_age_h` 1 — the Studio index job rebuilds it every 15 min). Nothing reported a dead hub
+  before this.
+- **`fleet_watchdog.py`** — `dashboards-sync` mirrored in `ROUTINES` (`*/10 * * * *`, 30 min grace,
+  `sync.log` mtime) so the out-of-band watchdog sees it too.
+- **`morning_page.py`** — "Dashboard Hub" footer link.
+
+### Changed
+- The Studio screener probe uses the tailnet name instead of `.local`, so it also resolves away from the
+  home LAN. Not mirrored in `TIMELINE_LAUNCHD`: a 10-minute job has no place on a daily-fires timeline.
+
 ## [2026-10-25] — Morning Page links work over the dashboard hub
 
 ### Changed

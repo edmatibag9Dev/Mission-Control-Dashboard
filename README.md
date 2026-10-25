@@ -45,7 +45,9 @@ and swept every morning by an agent that only interrupts when something is actua
   slot plus its grace (1.5 h daily, 2 h weekly scan, 1 h report) passes with no heartbeat, the job
   reads **Missed** (Mac off or job unloaded). A `partial` heartbeat (suspected Yahoo outage, nothing
   written) reads **Partial**. Both escalate like Failed, and both are alert-only.
-- **Server probes** — local port checks plus a remote HTTP HEAD of the Mac Studio screener with
+- **Server probes** — local port checks (including the dashboard-hub root on :8800), and since 2026-10-25 a
+  HEAD of the Studio hub's `catalog.json`, whose `Last-Modified` is the hub index job's success stamp
+  (stale past 1 h). Plus a remote HTTP HEAD of the Mac Studio screener with
   `Last-Modified` freshness; an asleep remote host shows amber, never a false red.
 - **Grouped dashboard** — 9 purpose-group cards with health rollups (retired and one-time tasks
   live only in the collapsed section at the bottom, so they never drag a card's count down), script-jobs table, servers
@@ -160,7 +162,8 @@ update `samples/` instead when a shape changes.
   `~/Documents/Claude/claude-token-dashboard.html` (plan limits scraped by the 6:10 PM task), and
   `AI-orchestration-layer/runs/repair.jsonl` + `ops-commands.jsonl` (restarts, queued Slack commands).
   Token data is a day behind in the morning render; the 8 PM render catches up.
-- Servers: localhost ports 8765/8787 and `http://eds-mac-studio.local:8080/latest.html`.
+- Servers: localhost ports 8765/8787/8800, `http://eds-mac-studio.tail284bf0.ts.net:8080/index.html` and the
+  dashboard-hub catalog `https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json` (stale past 1 h).
 
 ## Known Limitations
 

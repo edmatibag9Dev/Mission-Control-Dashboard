@@ -99,6 +99,9 @@ ROUTINES = [
     # write their own heartbeats on EVERY exit path, incl. the season-off SKIP
     # (exit 64) — so a heartbeat is always due at the slot, in or out of season.
     # The three share one log file (MW), which is why HB is the real evidence.
+    # dashboard-hub sync (launchd, every 10 min, 2026-10-25): sync.log gains a line on every
+    # run, so its mtime is liveness. 30 min grace = three missed fires.
+    ("dashboards-sync",                "*/10 * * * *", 30,  [(MT, HOME / "Library/Logs/dashboard-hub/sync.log")]),
     ("earnings-put-daily-scan",        "45 6 * * 1-5", 120, [(HB, None),
                                                              (MW, HOME / "Library/Logs/earnings-put-screener/scan.log")]),
     ("daily-ai-morning-briefing",      "45 7 * * *",   180, [(HB, None)]),
