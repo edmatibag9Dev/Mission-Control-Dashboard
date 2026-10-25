@@ -59,7 +59,11 @@ and swept every morning by an agent that only interrupts when something is actua
   Mission Control, open Lane-2 digest items plus Slack alert-channel links, a Fleet tile, Claude plan
   gauges (amber at 50%, red at 80%), and token burn by vendor (Claude vs OpenAI, yesterday and 7 days,
   stacked daily chart, 7-day API-equivalent cost). No model writes it, so it renders with the Claude
-  app closed. It never writes to any source it reads.
+  app closed. It never writes to any source it reads. Two staleness banners: one at render time when
+  `ops-status.json` is over 26 hours old (the watcher did not run), and one the browser raises itself
+  when the page's own render stamp is over 26 hours behind the viewer's clock (the renderer crashed or
+  no runner rebuilt it). The second re-checks whenever the tab regains focus, so a page left open on a
+  phone turns red on its own.
 - **Run-record shadow (2026-09-30)** — for a routine that fired and went silent, the runner agent
   fetches the scheduler's run record and `watch.py` proposes a verdict: a session that died on a
   transient server or network error is flagged restart-eligible or blocked by guard. Shadow mode
@@ -190,6 +194,8 @@ update `samples/` instead when a shape changes.
   shows `n/a` with an empty bar (since 2026-10-25; before, the render crashed on it).
 - Morning Page: the dashboard links assume the hub's sibling-slug layout, so the page opened from
   this repo folder has dead Mission Control / Command Center / Token Burn links.
+- Morning Page: the page-staleness banner trusts the viewing device's clock. A device with a wrong
+  clock shows it early or late; it never affects the rendered figures.
 
 ## Workarounds
 

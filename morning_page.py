@@ -590,6 +590,15 @@ def render(ctx):
     links_html = "\n    ".join(f'<a href="{esc(u)}">{esc(n)}</a>' for n, u in SOURCE_LINKS)
     stale_html = (f'<div class="stale"><strong>This view is stale.</strong> Fleet status was generated more than 26 hours ago '
                   f'({gen.strftime("%a %-I:%M %p") if gen else "unknown"}). The ops-watcher did not run.</div>' if stale else "")
+    # Page-level self-check: the browser compares the render stamp with its own clock, so a page
+    # nobody re-rendered (crashed renderer, dead runner, Mac asleep) announces itself when opened.
+    # Hidden until the script below shows it; re-checked whenever the tab regains focus.
+    stale_hours = int(STALE_AFTER.total_seconds() // 3600)
+    rendered_ms = int(now.timestamp() * 1000)
+    page_stale_html = (f'<div class="stale" id="page-stale"><strong>This page is stale.</strong> It was rendered '
+                       f'{now.strftime("%a %b %-d, %-I:%M %p")}, <span id="page-stale-age"></span> ago, and the runners '
+                       f'(8:04 AM, 9 AM, 8 PM) have not rebuilt it since. Mission Control and the token figures here may be '
+                       f'out of date; run <code>python3 morning_page.py</code> in Mission-Control-Dashboard.</div>')
 
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -639,6 +648,8 @@ a:focus-visible{{outline:2px solid var(--accent);outline-offset:2px}}
 .verdict b{{font-weight:600}}
 .stamp{{color:var(--muted);font-size:12px}}
 .stale{{padding:10px 14px;border-radius:8px;background:var(--chip-bad);color:var(--danger-strong)}}
+.stale code{{font-family:var(--font-mono);font-size:12px}}
+#page-stale{{display:none}}
 .eyebrow{{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}}
 .eyebrow small{{font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);margin-left:8px}}
 .summary{{margin:0;padding:12px 18px 12px 34px;border-left:3px solid var(--brand);background:var(--raised);border-radius:0 8px 8px 0;font-size:14px;line-height:1.5;display:grid;grid-template-columns:1fr 1fr;gap:4px 28px}}
@@ -732,6 +743,7 @@ a:focus-visible{{outline:2px solid var(--accent);outline-offset:2px}}
 @media (max-width:1000px){{.tiles,.two,.summary{{grid-template-columns:1fr}}.burn{{grid-template-columns:1fr}}}}
 </style></head><body>
 <div class="page">
+  {page_stale_html}
   {stale_html}
   <header class="hdr">
     <div>
@@ -834,6 +846,25 @@ a:focus-visible{{outline:2px solid var(--accent);outline-offset:2px}}
     <span class="note">Read-only over ops-status.json, USAGE_SUMMARY, daily-burn.json, digest.jsonl</span>
   </footer>
 </div>
+<script>
+(function () {{
+  var rendered = {rendered_ms}, limitH = {stale_hours};
+  function checkStale() {{
+    var ageH = (Date.now() - rendered) / 3600000;
+    var el = document.getElementById("page-stale");
+    if (ageH > limitH) {{
+      document.getElementById("page-stale-age").textContent =
+        ageH < 48 ? Math.round(ageH) + " hours" : Math.round(ageH / 24) + " days";
+      el.style.display = "block";
+    }} else {{
+      el.style.display = "none";
+    }}
+  }}
+  checkStale();
+  document.addEventListener("visibilitychange", function () {{ if (!document.hidden) checkStale(); }});
+  window.checkStale = checkStale;
+}})();
+</script>
 </body></html>
 """
 

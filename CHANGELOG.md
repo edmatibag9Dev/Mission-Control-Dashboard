@@ -54,6 +54,13 @@ Gitignored data/output files are never committed.
   origin, and from the staged root on disk. A `file://` href did nothing from a phone or an agent
   reading the page over HTTPS. `watch.py` already had no `file://` links.
 
+### Added
+- **`morning_page.py`** — a page-level staleness banner. The browser compares the render stamp
+  embedded in the page with its own clock and, past 26 hours (`STALE_AFTER`), shows a red banner
+  with the render time and age ("27 hours", "5 days") and the rebuild command. It re-checks when the
+  tab regains focus. Motivation: the render had been failing since 2026-10-24 and nothing on the page
+  said so; the existing banner only covers a stale `ops-status.json`, not a stale page.
+
 ### Fixed
 - **`morning_page.py`** — the plan-limits tile no longer crashes the render when the Command
   Center reports a limit as the string `n/a` (its 2026-10-24 export did, for the Fable weekly bar;
