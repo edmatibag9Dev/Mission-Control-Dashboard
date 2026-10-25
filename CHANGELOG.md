@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); dates are Americ
 Gitignored data/output files are never committed.
 
 
+## [2026-10-25] — Tailnet hostnames move out of the public repo
+
+### Changed
+- **`watch.py`**, **`morning_page.py`** — the Studio hostname, hub URL and screener URL come from
+  `runs/hosts.local.json` (gitignored; `samples/sample.hosts.local.json` shows the shape). Without the
+  file, probes fall back to `eds-mac-studio.local` and hub links to `localhost:8800`.
+- README, CHANGELOG and AGENTS use `<STUDIO_TAILNET_HOST>` / `<MACBOOK_TAILNET_HOST>` placeholders. The
+  two earlier commits that carried the name remain in history; this removes it from the tree going forward.
+
 ## [2026-10-25] — Old dashboard servers retired
 
 ### Removed
@@ -13,7 +22,7 @@ Gitignored data/output files are never committed.
   `catalog.json`.
 
 ### Changed
-- **`watch.py`** — the Studio screener probe is `https://eds-mac-studio.tail284bf0.ts.net:8444/index.html`
+- **`watch.py`** — the Studio screener probe is `https://<STUDIO_TAILNET_HOST>:8444/index.html`
   (tailscale serve in front of the Ruby server).
 - **`morning_page.py`** — AI Briefing and Open Brain review footer links point at the hub.
 
@@ -22,7 +31,7 @@ Gitignored data/output files are never committed.
 ### Added
 - **`watch.py`** — `dashboards-sync` launchd job in `SCRIPT_JOBS_STATIC` (evidence
   `~/Library/Logs/dashboard-hub/sync.log`, `ok_line` `pushed=True`, 1 h), plus two server probes:
-  local port 8800 (hub root on this Mac) and `https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json`
+  local port 8800 (hub root on this Mac) and `https://<STUDIO_TAILNET_HOST>/catalog.json`
   (remote, `max_age_h` 1 — the Studio index job rebuilds it every 15 min). Nothing reported a dead hub
   before this.
 - **`fleet_watchdog.py`** — `dashboards-sync` mirrored in `ROUTINES` (`*/10 * * * *`, 30 min grace,
@@ -41,7 +50,7 @@ Gitignored data/output files are never committed.
   (`../mission-control/mission-control.html`, `../command-center/claude-token-dashboard.html`,
   `../token-burn/token-burn-dashboard.html`) instead of absolute `file:///Users/edmatibag/...` URLs.
   The dashboard-hub (2026-10-25) serves every page under its own slug directory as siblings, so the
-  links resolve on the hub (`https://eds-mac-studio.tail284bf0.ts.net:8443/`), on the MacBook
+  links resolve on the hub (`https://<STUDIO_TAILNET_HOST>/`), on the MacBook
   origin, and from the staged root on disk. A `file://` href did nothing from a phone or an agent
   reading the page over HTTPS. `watch.py` already had no `file://` links.
 

@@ -86,6 +86,7 @@ and swept every morning by an agent that only interrupts when something is actua
 | `com.edmatibag.slack-ops-poller.plist` | launchd job for the poller (3-min interval; install instructions in the file header). |
 | `SCHEDULE.md` | How the daily sweep is scheduled and its runtime prerequisites. |
 | `OPS-RUNBOOK.md` | Operator runbook: the detect/repair/command system in one picture, the five Slack commands, incident playbooks by failure class, and the full rebuild appendix. |
+| `samples/sample.hosts.local.json` | Shape of `runs/hosts.local.json`: tailnet hostnames for the Studio probes and hub links (gitignored). |
 | `samples/` | Scrubbed samples of the gitignored runtime data. |
 | `CONTRIBUTING.md` | Commit format + README standards (canonical copy). |
 | `CHANGELOG.md` | Dated log of notable changes. |
@@ -121,8 +122,8 @@ Open it through the dashboard hub, not from this folder: the hub stages every da
 own slug directory (`<root>/morning-page/`, `<root>/mission-control/`, `<root>/command-center/`,
 `<root>/token-burn/`), and since 2026-10-25 the page's links to Mission Control, the Command Center
 and Token Burn are relative hub paths (`../mission-control/mission-control.html` and so on). They
-resolve on `https://eds-mac-studio.tail284bf0.ts.net:8443/morning-page/morning-page.html` (hub), on
-the MacBook origin `https://ed-macbook-pro-m1x.tail284bf0.ts.net/morning-page/morning-page.html`,
+resolve on `https://<STUDIO_TAILNET_HOST>/morning-page/morning-page.html` (hub), on
+the MacBook origin `https://<MACBOOK_TAILNET_HOST>/morning-page/morning-page.html`,
 and from the staged root on disk (`/Users/Shared/dashboards/morning-page/morning-page.html`). Opened
 straight from this repo folder, those three links have no sibling directory to point at and 404; the
 server links (AI Briefing, Earnings Put Screener, Open Brain review) work either way. Needs-a-look
@@ -162,8 +163,8 @@ update `samples/` instead when a shape changes.
   `~/Documents/Claude/claude-token-dashboard.html` (plan limits scraped by the 6:10 PM task), and
   `AI-orchestration-layer/runs/repair.jsonl` + `ops-commands.jsonl` (restarts, queued Slack commands).
   Token data is a day behind in the morning render; the 8 PM render catches up.
-- Servers: localhost port 8800 (hub root), `https://eds-mac-studio.tail284bf0.ts.net:8444/index.html` (screener) and the
-  dashboard-hub catalog `https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json` (stale past 1 h).
+- Servers: localhost port 8800 (hub root), `https://<STUDIO_TAILNET_HOST>:8444/index.html` (screener) and the
+  dashboard-hub catalog `https://<STUDIO_TAILNET_HOST>/catalog.json` (stale past 1 h).
 
 ## Known Limitations
 

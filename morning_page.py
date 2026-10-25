@@ -36,6 +36,12 @@ STATUS = ROOT / "runs" / "ops-status.json"
 SNAPSHOT = ROOT / "runs" / "scheduled-tasks-snapshot.json"
 HEARTBEAT = ROOT / "runs" / "heartbeat.jsonl"
 LOCAL_CFG = ROOT / "runs" / "morning-page.local.json"
+HOSTS_CFG_PATH = ROOT / "runs" / "hosts.local.json"      # tailnet hostnames; gitignored, sample in samples/
+try:
+    HUB_URL = json.loads(HOSTS_CFG_PATH.read_text()).get("hub_url", "").rstrip("/")
+except (OSError, ValueError):
+    HUB_URL = ""
+HUB_URL = HUB_URL or "http://localhost:8800"             # staged root on this Mac when no config
 REPAIR = ORCH / "runs" / "repair.jsonl"
 COMMANDS = ORCH / "runs" / "ops-commands.jsonl"
 DAILY_BURN = TOKENBURN / "daily-burn.json"
@@ -47,7 +53,7 @@ OUT = ROOT / "morning-page.html"
 # Dashboard links are relative hub paths, not file:// URLs. The dashboard-hub stages every page
 # under its own slug directory as siblings of this one (<root>/morning-page/, <root>/mission-control/,
 # <root>/command-center/, <root>/token-burn/), so these resolve wherever that root is served:
-# https://eds-mac-studio.tail284bf0.ts.net:8443/ (hub), the MacBook origin, or the staged root on disk.
+# the dashboard hub (`hub_url` in runs/hosts.local.json), the MacBook origin, or the staged root on disk.
 # A file:// href does nothing when the page is opened over HTTPS from a phone or by an agent.
 MC_LINK = "../mission-control/mission-control.html"
 COMMAND_CENTER_LINK = "../command-center/claude-token-dashboard.html"
@@ -97,10 +103,10 @@ SOURCE_LINKS = [
     ("Mission Control", MC_LINK),
     ("Claude Token Command Center", COMMAND_CENTER_LINK),
     ("Token Burn Dashboard", TOKEN_BURN_LINK),
-    ("Dashboard Hub", "https://eds-mac-studio.tail284bf0.ts.net:8443/"),
-    ("AI Briefing", "https://eds-mac-studio.tail284bf0.ts.net:8443/ai-briefing/index.html"),
+    ("Dashboard Hub", f"{HUB_URL}/"),
+    ("AI Briefing", f"{HUB_URL}/ai-briefing/index.html"),
     ("Earnings Put Screener", "http://eds-mac-studio.local:8080/index.html"),
-    ("Open Brain review", "https://eds-mac-studio.tail284bf0.ts.net:8443/open-brain-review/review-dashboard.local.html"),
+    ("Open Brain review", f"{HUB_URL}/open-brain-review/review-dashboard.local.html"),
 ]
 # Channel names only; ids + workspace come from runs/morning-page.local.json (never committed).
 ALERT_CHANNELS = ["ops-control", "token-dashboard-alerts", "ai-briefing",

@@ -33,6 +33,7 @@ noticing an absent Slack ping.**
 | `samples/` | yes | Scrubbed samples of the gitignored runtime data so the repo previews. |
 | `mission-control.html` | **no (gitignored)** | Generated dashboard — rebuilt by every run; never hand-edit. |
 | `morning-page.html` | **no (gitignored)** | Generated Morning Page — rebuilt after every `watch.py` run; never hand-edit. |
+| `runs/hosts.local.json` | **no (gitignored)** | Tailnet hostnames: `studio_host`, `hub_url`, `screener_url`. Read by `watch.py` (SERVERS) and `morning_page.py` (SOURCE_LINKS). Without it the probes fall back to `eds-mac-studio.local` and the hub links to `localhost:8800`. Sample in `samples/`. |
 | `runs/morning-page.local.json` | **no (gitignored)** | Slack workspace + channel ids for the Morning Page's channel links. Sample in `samples/`. |
 | `CONFIG.local.md` | **no (gitignored)** | Real values for placeholders in committed docs (`<SLACK_WORKSPACE>`, `<SLACK_CHANNEL_ID>`, `<SLACK_USER_ID>` in OPS-RUNBOOK.md). |
 | `runs/` | **no (gitignored)** | Runtime data: task snapshot, heartbeats, ops-status, dated history archives. |
@@ -152,6 +153,7 @@ Pipeline — native Mac runtime.
   (`eds-mac-studio.local`) are acceptable per the repo standard.
 - Digest item texts pass through the dashboard — they may reference other projects; that is why the
   rendered HTML stays gitignored.
+- Tailnet hostnames (`*.ts.net`) never appear in committed files; they live in `runs/hosts.local.json`. Docs use `<STUDIO_TAILNET_HOST>` / `<MACBOOK_TAILNET_HOST>`.
 
 ## Verification gates
 

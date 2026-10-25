@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to runs/hosts.local.json (gitignored) and fill in. Tailnet names never go in committed files.",
+  "studio_host": "<STUDIO_TAILNET_HOST>",
+  "hub_url": "https://<STUDIO_TAILNET_HOST>",
+  "screener_url": "https://<STUDIO_TAILNET_HOST>:8444"
+}

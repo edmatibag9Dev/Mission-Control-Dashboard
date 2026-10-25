@@ -157,18 +157,31 @@ SCRIPT_JOBS_STATIC = [
 CODEX_CAPTURE = Path.home() / ".codex/session-capture"
 CODEX_STUCK_ATTEMPTS = 288          # one day of 5-minute retries
 
+# Hosts that are private to Ed's tailnet live in runs/hosts.local.json (gitignored; sample in
+# samples/). Without it the probes fall back to the LAN-only .local name and the hub probes
+# read unreachable off the LAN — the public repo never carries the tailnet name.
+def _hosts_cfg():
+    try:
+        return json.loads((ROOT / "runs" / "hosts.local.json").read_text())
+    except (OSError, ValueError):
+        return {}
+HOSTS_CFG = _hosts_cfg()
+STUDIO_HOST = HOSTS_CFG.get("studio_host", "eds-mac-studio.local")
+HUB_URL = HOSTS_CFG.get("hub_url", f"http://{STUDIO_HOST}:8800").rstrip("/")
+SCREENER_URL = HOSTS_CFG.get("screener_url", f"http://{STUDIO_HOST}:8080").rstrip("/")
+
 SERVERS = [
     # 2026-10-25: the :8765 (AI Briefing) and :8787 (Open Brain review) servers were retired;
     # both pages are now served from the dashboard hub root (:8800 here, :8443 on the Studio).
-    # The screener sits behind tailscale serve :8444 (TLS) in front of studio_server.rb :8080.
+    # The screener sits behind tailscale serve (TLS) in front of studio_server.rb :8080.
     {"id": "earnings-put-scanner @ eds-mac-studio", "kind": "http",
-     "url": "https://eds-mac-studio.tail284bf0.ts.net:8444/index.html", "max_age_h": 8 * 24, "remote": True,
+     "url": f"{SCREENER_URL}/index.html", "max_age_h": 8 * 24, "remote": True,
      "desc": "Earnings Put Screener served from the Mac Studio"},
     # dashboard-hub (2026-10-25): local root server, and the Studio hub's catalog.json whose
     # Last-Modified is the hub index job's success stamp (rebuilds every 15 min → 1 h = dead).
     {"id": "dashboards-server", "kind": "port", "port": 8800, "desc": "Dashboard hub root on this Mac"},
     {"id": "dashboard-hub @ eds-mac-studio", "kind": "http",
-     "url": "https://eds-mac-studio.tail284bf0.ts.net:8443/catalog.json", "max_age_h": 1, "remote": True,
+     "url": f"{HUB_URL}/catalog.json", "max_age_h": 1, "remote": True,
      "desc": "Dashboard hub catalog on the Mac Studio (index rebuilds every 15 min)"},
 ]
 
