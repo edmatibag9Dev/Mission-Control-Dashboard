@@ -51,6 +51,10 @@ External dependencies (read, never owned here):
   Since 2026-10-24 those three are slot-aware (`cron` + `grace_h`): a passed slot with no heartbeat
   reads `missed`, and a `partial` heartbeat (suspected Yahoo outage, nothing written) reads
   `partial`. Both are in `BAD_JOB`, so they set ESCALATE-CANDIDATE like `failed`.
+- `<HUB_URL>/gainers-analysis/status.json` (2026-11-05) — the Mac Studio's `gainers-analysis` launchd
+  job, read over Tailscale by `check_gainers_analysis()`. Fields and health rules are owned by
+  `projects/gainers-analysis/MONITORING.md` in `edmatibag9Dev/rob-booker-chat-api`. Read-only GET,
+  5 s timeout. Its `stuck` and `unreachable` are in `BAD_JOB` (Ed asked for both to alert).
 
 ## The data contract
 
@@ -96,6 +100,8 @@ Invariants an agent must preserve:
 5. The tokenburn pair's health keys off the **last-success stamp**, never watchdog log mtime
    (the watchdog is silent by design when healthy).
 6. Remote-server `unreachable` is amber and never escalates alone; reachable-but-stale content is red.
+   Exception: the `gainers-analysis @ eds-mac-studio` script job escalates on `unreachable` — a job
+   read only over the network has no other evidence (2026-11-05).
 9. `retired` (disabled + description opens `[RETIRED`) and job `degraded` are amber/grey states that
    never escalate alone. `degraded` means the job runs but some work items are not landing.
 10. The STALLED detail must not assert a single cause unless a matched scheduler run record proves it

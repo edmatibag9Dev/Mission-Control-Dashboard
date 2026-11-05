@@ -170,6 +170,15 @@ STUDIO_HOST = HOSTS_CFG.get("studio_host", "eds-mac-studio.local")
 HUB_URL = HOSTS_CFG.get("hub_url", f"http://{STUDIO_HOST}:8800").rstrip("/")
 SCREENER_URL = HOSTS_CFG.get("screener_url", f"http://{STUDIO_HOST}:8080").rstrip("/")
 
+# gainers-analysis (2026-11-05) runs under launchd on the Studio, not here, so its health
+# comes from the status.json it writes next to its page on the hub — fields and health
+# rules: rob-booker-chat-api projects/gainers-analysis/MONITORING.md. Read-only GET.
+GAINERS_STATUS_URL = f"{HUB_URL}/gainers-analysis/status.json"
+GAINERS_STUCK_H = 2       # result "running" with started older than this
+GAINERS_MISSED_H = 1      # next_scheduled this far in the past = the weekday run didn't happen
+GAINERS_STALE_H = 26      # last_success age on Tue-Fri; Mon (and the weekend) allow 74h
+GAINERS_STALE_MON_H = 74
+
 SERVERS = [
     # 2026-10-25: the :8765 (AI Briefing) and :8787 (Open Brain review) servers were retired;
     # both pages are now served from the dashboard hub root (:8800 here, :8443 on the Studio).
@@ -611,7 +620,50 @@ def check_script_jobs(now: datetime, heartbeats=None):
         jobs.append({"id": j["id"], "desc": j["desc"], "schedule": j["schedule"],
                      "status": st, "detail": detail, "last": dt.isoformat() if dt else None})
     jobs.append(check_codex_capture(now))
+    jobs.append(check_gainers_analysis(now))
     return jobs
+
+
+def check_gainers_analysis(now: datetime):
+    row = {"id": "gainers-analysis @ eds-mac-studio",
+           "desc": "Gainers vs. short plan analysis on the Mac Studio (status.json over Tailscale)",
+           "schedule": "Weekdays 6:30 PM + on new TradeZero export", "last": None}
+    try:
+        with urllib.request.urlopen(GAINERS_STATUS_URL, timeout=5) as resp:
+            st = json.loads(resp.read(65536))
+    except Exception as e:
+        row["status"] = "unreachable"
+        row["detail"] = f"status.json did not answer ({type(e).__name__}) — Studio, Tailscale or hub web server down"
+        return row
+    started, finished = parse_iso(st.get("started")), parse_iso(st.get("finished"))
+    last_ok, nxt = parse_iso(st.get("last_success")), parse_iso(st.get("next_scheduled"))
+    row["last"] = (finished or started).isoformat() if (finished or started) else None
+    hb = (st.get("heartbeat") or "").strip()[:160]
+    # Assumption: Saturday and Sunday get the Monday allowance — MONITORING.md only states
+    # weekday limits, and Friday's run is 48h+ old by Sunday evening.
+    stale_h = GAINERS_STALE_H if now.weekday() in (1, 2, 3, 4) else GAINERS_STALE_MON_H
+    if st.get("result") == "failed":
+        row["status"] = "failed"
+        row["detail"] = (f"last run failed {fmt(finished, now)} (exit {st.get('exit_code')}, "
+                         f"trigger {st.get('trigger')}): {(st.get('error') or 'no error line')[:160]}")
+    elif st.get("result") == "running" and started and now - started > timedelta(hours=GAINERS_STUCK_H):
+        row["status"] = "stuck"
+        row["detail"] = f"running since {fmt(started, now)} — over {GAINERS_STUCK_H}h"
+    elif st.get("result") == "running":
+        # Before the missed check: next_scheduled may still name the slot this run is serving.
+        row["status"] = "pending"
+        row["detail"] = f"running since {fmt(started, now)} ({st.get('trigger')}) — last: {hb}"
+    elif nxt and now - nxt > timedelta(hours=GAINERS_MISSED_H):
+        row["status"] = "missed"
+        row["detail"] = (f"weekday run due {fmt(nxt, now)} did not happen — Studio off or logged out, "
+                         f"or launchd lost the job; alert-only, never restart")
+    elif last_ok is None or (now - last_ok).total_seconds() / 3600 > stale_h:
+        row["status"] = "stale"
+        row["detail"] = f"last success {fmt(last_ok, now)} (max {stale_h}h)"
+    else:
+        row["status"] = "ok"
+        row["detail"] = f"finished {fmt(finished, now)} — {hb}"
+    return row
 
 
 def last_nonempty_line(path: Path, tail_bytes: int = 4096):
@@ -706,6 +758,7 @@ BADGE = {
     "pending":   ("#2B6CB0", "#2B6CB0", "In window"),
     "missed":    ("#B91C1C", "#D64545", "Missed"),
     "stalled":   ("#B91C1C", "#D64545", "Stalled"),
+    "stuck":     ("#B91C1C", "#D64545", "Stuck"),
     "failed":    ("#B91C1C", "#D64545", "Failed"),
     "down":      ("#B91C1C", "#D64545", "Down"),
     "stale":     ("#B91C1C", "#D64545", "Stale"),
@@ -723,7 +776,8 @@ BADGE = {
 
 BAD_ROUTINE = ("missed", "failed", "stalled")
 WARN_ROUTINE = ("partial", "off", "note")
-BAD_JOB = ("failed", "stale", "missed", "partial")   # job partial = no output that run (Ed, 2026-10-24)
+BAD_JOB = ("failed", "stale", "missed", "partial",   # job partial = no output that run (Ed, 2026-10-24)
+           "stuck", "unreachable")   # gainers-analysis only (Ed, 2026-11-05): a job read over the network escalates when unreachable
 WARN_JOB = ("degraded",)
 BAD_SERVER = ("down", "stale")
 

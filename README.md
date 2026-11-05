@@ -45,6 +45,10 @@ and swept every morning by an agent that only interrupts when something is actua
   slot plus its grace (1.5 h daily, 2 h weekly scan, 1 h report) passes with no heartbeat, the job
   reads **Missed** (Mac off or job unloaded). A `partial` heartbeat (suspected Yahoo outage, nothing
   written) reads **Partial**. Both escalate like Failed, and both are alert-only.
+  Since 2026-11-05 the Mac Studio's `gainers-analysis` job is read over Tailscale from the
+  `status.json` it publishes on the hub (read-only GET, 5 s timeout): **Failed** (with its `error`
+  line), **Stuck** (running over 2 h), **Missed** (weekday run 1 h overdue), **Stale** (last success
+  over 26 h, 74 h on Mon/weekend) and **Unreachable** all escalate; OK shows its `heartbeat` line.
 - **Server probes** — local port checks (including the dashboard-hub root on :8800), and since 2026-10-25 a
   HEAD of the Studio hub's `catalog.json`, whose `Last-Modified` is the hub index job's success stamp
   (stale past 1 h). Plus a remote HTTP HEAD of the Mac Studio screener with
@@ -159,7 +163,8 @@ update `samples/` instead when a shape changes.
   `~/Open-Brain/.wiki-compile.log` (last line must read `compile OK`), `runs/ops-poller-state.json`
   (rewritten only after a successful Slack read), `~/.codex/session-capture/logs/worker.log` and
   `adapter.jsonl` (delivery attempt counters), heartbeat rows for the three earnings-put launchd jobs (`earnings-put-weekly-scan`, `-daily-scan`, `-weekly-report`, since 2026-09-10), the earnings
-  screener's `_launchd_scan.log`.
+  screener's `_launchd_scan.log`, and the Studio's `<hub>/gainers-analysis/status.json` (hub URL from
+  `runs/hosts.local.json`).
 - Morning Page only (all read-only): `~/Documents/Claude/Projects/Token Burn Dashboard/daily-burn.json`
   (tokens by source per day; Claude = Cowork + Claude Code, OpenAI = Codex exact + ChatGPT estimated,
   cache excluded), `sessions.json` (API-equivalent cost, Anthropic models only), `chatgpt-export-meta.json`

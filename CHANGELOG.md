@@ -4,6 +4,18 @@ All notable changes to Mission Control Dashboard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); dates are America/Los_Angeles.
 Gitignored data/output files are never committed.
 
+## [2026-11-05] — Mac Studio gainers-analysis job in Script jobs
+
+### Added
+- **`watch.py`** — `check_gainers_analysis()` reads the Studio's `<hub>/gainers-analysis/status.json` over
+  Tailscale (read-only GET, 5 s timeout) and shows it as `gainers-analysis @ eds-mac-studio`. Health rules
+  follow the job's MONITORING.md: failed (shows `error`), stuck (running > 2 h), missed (`next_scheduled`
+  > 1 h past), stale (`last_success` > 26 h; 74 h on Monday and, by assumption, the weekend), unreachable.
+  OK shows the `heartbeat` line. A run still under 2 h reads In window.
+- **`watch.py`** — new `stuck` badge; `stuck` and `unreachable` join `BAD_JOB`, so they set
+  ESCALATE-CANDIDATE. No other job produces either status.
+- **`morning_page.py`** — a timeline cell for the weekday 18:30 run.
+
 
 ## [2026-10-25] — Tailnet hostnames move out of the public repo
 

@@ -98,6 +98,7 @@ TIMELINE_LAUNCHD = [
     ("Earnings daily update", "earnings-put-daily-scan", "45 6 * * 1-5"),
     ("Earnings weekly scan", "earnings-put-weekly-scan", "0 12 * * 5"),
     ("Earnings weekly report", "earnings-put-weekly-report", "0 14 * * 5"),
+    ("Gainers analysis (Studio)", "gainers-analysis @ eds-mac-studio", "30 18 * * 1-5"),
 ]
 SOURCE_LINKS = [
     ("Mission Control", MC_LINK),
